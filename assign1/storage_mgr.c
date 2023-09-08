@@ -74,7 +74,7 @@ extern RC appendEmptyBlock (SM_FileHandle *fHandle) {
 		return RC_WRITE_FAILED;
 	}
 	// We need add total number first, cause we append a new block.
-	fHandle->totalNumPages++;
+	fHandle->totalNumPages = fHandle->totalNumPages + 1;
 	// Write the newBlock to the file.
 	fwrite(newBlock, sizeof(char), PAGE_SIZE, pageFile);
 	// Use free to release the memory usage.

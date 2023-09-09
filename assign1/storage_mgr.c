@@ -21,6 +21,7 @@ extern RC createPageFile (char *fileName) {
         return RC_FILE_NOT_FOUND;
 	}
 
+	else{
         memory=(char*)malloc(PAGE_SIZE);
         memset(memory, '\0', PAGE_SIZE); 
 		size_t no_of_bytes=fwrite(memory, 1 , PAGE_SIZE, pageFile);	
@@ -31,10 +32,11 @@ extern RC createPageFile (char *fileName) {
 		free(memory);		
 		fclose(pageFile);			
 		return RC_OK;
+	}
 }
 
 extern RC openPageFile (char *fileName, SM_FileHandle *fHandle) {
-	pageFile=fopen(fileName,"r");
+	pageFile=fopen(fileName,"r+");
 	 if(pageFile == NULL)
 	{
         return RC_FILE_NOT_FOUND;
@@ -69,7 +71,7 @@ extern RC destroyPageFile (char *fileName) {
 
 extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
-	/*if (pageNum < 0 || pageNum >= fHandle->totalNumPages) {
+	if (pageNum < 0 || pageNum >= fHandle->totalNumPages) {
 
         return RC_READ_NON_EXISTING_PAGE;
     }
@@ -98,40 +100,9 @@ extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
         
 		}
 	}
-*/
-
-	if(fHandle->totalNumPages<pageNum){
-		return RC_READ_NON_EXISTING_PAGE;
-
-	}
-	else if(pageNum<0){
-		return RC_READ_NON_EXISTING_PAGE;
-
-	}
-	else{
-		float read;
-		
-		fseek(pageFile,pageNum*PAGE_SIZE, SEEK_SET);
-		
-		read=fread(memPage,sizeof(char),PAGE_SIZE,pageFile);
-		
-		
-		if(read>PAGE_SIZE){
-			return RC_READ_NON_EXISTING_PAGE;
-
-		}
-		else if(read<PAGE_SIZE){
-			return RC_READ_NON_EXISTING_PAGE;
-
-		}
-		
-		fHandle->curPagePos=pageNum;
-		return RC_OK;
-
-		}
-	}
 
 
+	
 extern int getBlockPos (SM_FileHandle *fHandle) {
 
 	{
@@ -154,7 +125,14 @@ extern RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
 // If the file handle is not null, using readblock, first block is read
     //Also returns an OK message  
-    if (fHandle != NULL) {
+    /*if (fHandle != NULL) {
+        
+		return readBlock(0, fHandle, memPage); // Reads the first block
+        return RC_OK; 
+        
+	}*/
+
+	if (fHandle != NULL) {
         RC result = readBlock(0, fHandle, memPage); // Reads the first block
         if (result == RC_OK) {
             return RC_OK; 
@@ -196,6 +174,7 @@ extern RC readCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
 	{
 		return RC_READ_NON_EXISTING_PAGE;
 	}
+	
 
 	int current_pg_num;
 		current_pg_num = fHandle->curPagePos;
@@ -210,12 +189,12 @@ extern RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
 	{
 		return RC_READ_NON_EXISTING_PAGE;
 	}
-
-	int current_pg_num;
+	
+		int current_pg_num;
 		current_pg_num = fHandle->curPagePos;
 		return readBlock(current_pg_num + 1, fHandle, memPage);
 		return RC_OK;
-
+	
 }
 
 extern RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){

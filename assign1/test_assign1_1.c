@@ -17,6 +17,9 @@ char *testName;
 static void testCreateOpenClose(void);
 static void testSinglePageContent(void);
 
+/* new test cases for checking multiple page content */
+static void testMultiplePageContent(void);
+
 /* main function running all tests */
 int
 main (void)
@@ -27,6 +30,9 @@ main (void)
 
   testCreateOpenClose();
   testSinglePageContent();
+  
+  /* more tests added */
+  testMultiplePageContent();
 
   return 0;
 }
@@ -93,6 +99,86 @@ testSinglePageContent(void)
     ASSERT_TRUE((ph[i] == (i % 10) + '0'), "character in page read from disk is the one we expected.");
   printf("reading first block\n");
 
+  // destroy new page file
+  TEST_CHECK(destroyPageFile (TESTPF));  
+  
+  TEST_DONE();
+}
+
+/** this test function is we added to check multiple page content */
+void
+testMultiplePageContent(void)
+{
+  SM_FileHandle fh;
+  SM_PageHandle ph;
+  int i;
+
+  testName = "test multiple page content";
+
+  ph = (SM_PageHandle) malloc(PAGE_SIZE);
+
+  // create a new page file
+  TEST_CHECK(createPageFile (TESTPF));
+  TEST_CHECK(openPageFile (TESTPF, &fh));
+  printf("created and opened file\n");
+  
+  // read first page into handle
+  TEST_CHECK(readFirstBlock (&fh, ph));
+  // the page should be empty (zero bytes)
+  for (i=0; i < PAGE_SIZE; i++) {
+    ASSERT_TRUE((ph[i] == 0), "expected zero byte in first page of freshly initialized page");
+  }
+  printf("first block was empty\n");
+    
+  // change ph to be a string and write that one to disk
+  for (i=0; i < PAGE_SIZE; i++) {
+    ph[i] = (i % 10) + '0';
+  }
+  TEST_CHECK(writeBlock (0, &fh, ph));
+  printf("writing first block\n");
+
+  // read the first block
+  TEST_CHECK(readFirstBlock (&fh, ph));
+  for (i=0; i < PAGE_SIZE; i++) {
+    ASSERT_TRUE((ph[i] == (i % 10) + '0'), "checked for the first block.");
+  }
+  printf("reading first block\n");
+
+  // change ph to another content for the second block
+  for (i=0; i < PAGE_SIZE; i++) {
+    ph[i] = (i % 10) + '1';
+  }
+  TEST_CHECK(writeCurrentBlock (&fh, ph));
+  printf("writing second block\n");
+  
+  // read the second block
+  TEST_CHECK(readCurrentBlock (&fh, ph));
+  for (i=0; i < PAGE_SIZE; i++) {
+    ASSERT_TRUE((ph[i] == (i % 10) + '1'), "checked for the second block.");
+  }
+  printf("reading second block\n");
+
+  // change the second block
+  for (i=0; i < PAGE_SIZE; i++) {
+    ph[i] = (i % 10) + '1';
+  }
+  TEST_CHECK(writeBlock (1, &fh, ph));
+  printf("change second block\n");
+
+  // read the second again
+  TEST_CHECK(readNextBlock (&fh, ph));
+  for (i=0; i < PAGE_SIZE; i++) {
+    ASSERT_TRUE((ph[i] == (i % 10) + '1'), "checked for the second block.");
+  }
+  printf("reading second block\n");
+  // read the previous again
+  TEST_CHECK(readCurrentBlock (&fh, ph));
+  for (i=0; i < PAGE_SIZE; i++) {
+    ASSERT_TRUE((ph[i] == (i % 10) + '1'), "checked for the second block.");
+  }
+  printf("reading second block\n");
+
+  TEST_CHECK(ensureCapacity(4,&fh));
   // destroy new page file
   TEST_CHECK(destroyPageFile (TESTPF));  
   

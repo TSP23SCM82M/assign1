@@ -5,7 +5,7 @@
 
 #include "storage_mgr.h"
 
-FILE *pageFile;
+FILE *textFile;
 
 extern void initStorageManager (void) {
 
@@ -13,10 +13,10 @@ extern void initStorageManager (void) {
 
 extern RC createPageFile (char *fileName) {
 	char * memory;
-	pageFile=fopen(fileName,"w");
+	textFile=fopen(fileName,"w");
 	
     
-    if(pageFile == NULL)
+    if(textFile == NULL)
 	{
         return RC_FILE_NOT_FOUND;
 	}
@@ -24,45 +24,45 @@ extern RC createPageFile (char *fileName) {
 	else{
         memory=(char*)malloc(PAGE_SIZE);
         memset(memory, '\0', PAGE_SIZE); 
-		size_t no_of_bytes=fwrite(memory, 1 , PAGE_SIZE, pageFile);	
+		size_t no_of_bytes=fwrite(memory, 1 , PAGE_SIZE, textFile);	
 		if(no_of_bytes!=PAGE_SIZE)
 		{
 			return RC_WRITE_FAILED;	
 		}
 		free(memory);		
-		fclose(pageFile);			
+		fclose(textFile);			
 		return RC_OK;
 	}
 }
 
 extern RC openPageFile (char *fileName, SM_FileHandle *fHandle) {
-	pageFile=fopen(fileName,"r+");
-	 if(pageFile == NULL)
+	textFile=fopen(fileName,"r+");
+	 if(textFile == NULL)
 	{
         return RC_FILE_NOT_FOUND;
 	}
 	fHandle->fileName=fileName;
-	fHandle->mgmtInfo=pageFile;
-	fseek(pageFile,0,SEEK_END);
-	long size=ftell(pageFile);
+	fHandle->mgmtInfo=textFile;
+	fseek(textFile,0,SEEK_END);
+	long size=ftell(textFile);
 	int totalPages=(int)(size/PAGE_SIZE);
 	fHandle->totalNumPages=totalPages;
 	fHandle->curPagePos=0;
-	//fclose(pageFile);
+	//fclose(textFile);
 	return RC_OK;
 
 }
 
 extern RC closePageFile (SM_FileHandle *fHandle) {
 	
-	fclose(pageFile);
+	fclose(textFile);
     fHandle=NULL;
     return RC_OK;
 }
 
 
 extern RC destroyPageFile (char *fileName) {
-	if (pageFile==NULL){
+	if (textFile==NULL){
         return RC_FILE_NOT_FOUND;
     }
     remove(fileName);
@@ -79,17 +79,17 @@ extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
         
 		float bytesRead;
 		
-		fseek(pageFile,pageNum*PAGE_SIZE, SEEK_SET);
+		fseek(textFile,pageNum*PAGE_SIZE, SEEK_SET);
 		
-		bytesRead=fread(memPage,sizeof(char),PAGE_SIZE,pageFile);
+		bytesRead=fread(memPage,sizeof(char),PAGE_SIZE,textFile);
 		
 		
         if (bytesRead != PAGE_SIZE) {
-            if (feof(pageFile)) {
+            if (feof(textFile)) {
             // The requested page is not found because the end of the file has been reached.
                 return RC_READ_NON_EXISTING_PAGE;
             }      
-            else if (ferror(pageFile)) {
+            else if (ferror(textFile)) {
             // During the read operation an error occurred. So handle the error or return an appropriate error code.
                 return RC_READ_NON_EXISTING_PAGE;
             }
@@ -192,6 +192,7 @@ extern RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
 	
 		int current_pg_num;
 		current_pg_num = fHandle->curPagePos;
+
 		return readBlock(current_pg_num + 1, fHandle, memPage);
 		return RC_OK;
 	
@@ -240,7 +241,7 @@ extern RC writeCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
 extern RC appendEmptyBlock (SM_FileHandle *fHandle) {
 	// Use fseek to reset the position.
-	int isSeekSuccess = fseek(pageFile, 0, SEEK_END);
+	int isSeekSuccess = fseek(textFile, 0, SEEK_END);
 	// Init an empty block using calloc.
 	SM_PageHandle newBlock = (SM_PageHandle)calloc(PAGE_SIZE, sizeof(char));
 	
@@ -252,7 +253,7 @@ extern RC appendEmptyBlock (SM_FileHandle *fHandle) {
 	// We need add total number first, cause we append a new block.
 	fHandle->totalNumPages = fHandle->totalNumPages + 1;
 	// Write the newBlock to the file.
-	fwrite(newBlock, sizeof(char), PAGE_SIZE, pageFile);
+	fwrite(newBlock, sizeof(char), PAGE_SIZE, textFile);
 	// Use free to release the memory usage.
 	free(newBlock);
 	
@@ -261,9 +262,9 @@ extern RC appendEmptyBlock (SM_FileHandle *fHandle) {
 
 extern RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle) {
 	// Open the file first and use "a" mode. Because we need append something to the file.
-	pageFile = fopen(fHandle->fileName, "a");
+	textFile = fopen(fHandle->fileName, "a");
 	
-	if (pageFile == NULL) {
+	if (textFile == NULL) {
 		// This means open failed.
 		return RC_FILE_NOT_FOUND;
 	}
@@ -275,6 +276,6 @@ extern RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle) {
 		appendEmptyBlock(fHandle);
 	}
 	// Close the file.
-	fclose(pageFile);
+	fclose(textFile);
 	return RC_OK;
 }

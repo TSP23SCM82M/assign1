@@ -8,19 +8,62 @@
 FILE *pageFile;
 
 extern void initStorageManager (void) {
+
 }
 
 extern RC createPageFile (char *fileName) {
+	char * memory;
+	pageFile=fopen(fileName,"w");
+	
+    
+    if(pageFile == NULL)
+	{
+        return RC_FILE_NOT_FOUND;
+	}
+
+        memory=(char*)malloc(PAGE_SIZE);
+        memset(memory, '\0', PAGE_SIZE); 
+		size_t no_of_bytes=fwrite(memory, 1 , PAGE_SIZE, pageFile);	
+		if(no_of_bytes!=PAGE_SIZE)
+		{
+			return RC_WRITE_FAILED;	
+		}
+		free(memory);		
+		fclose(pageFile);			
+		return RC_OK;
 }
 
 extern RC openPageFile (char *fileName, SM_FileHandle *fHandle) {
+	pageFile=fopen(fileName,"r");
+	 if(pageFile == NULL)
+	{
+        return RC_FILE_NOT_FOUND;
+	}
+	fHandle->fileName=fileName;
+	fHandle->mgmtInfo=pageFile;
+	fseek(pageFile,0,SEEK_END);
+	long size=ftell(pageFile);
+	int totalPages=(int)(size/PAGE_SIZE);
+	fHandle->totalNumPages=totalPages;
+	fHandle->curPagePos=0;
+	fclose(pageFile);
+	return RC_OK;
+
 }
 
 extern RC closePageFile (SM_FileHandle *fHandle) {
+	fclose(pageFile);
+    fHandle=NULL;
+    return RC_OK;
 }
 
 
 extern RC destroyPageFile (char *fileName) {
+	if (pageFile==NULL){
+        return RC_FILE_NOT_FOUND;
+    }
+    remove(fileName);
+    return RC_OK;
 }
 
 extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
@@ -114,15 +157,57 @@ extern RC readPreviousBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
 extern RC readCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
+	if (fHandle == NULL)
+	{
+		return RC_READ_NON_EXISTING_PAGE;
+	}
+
+	int current_pg_num;
+		current_pg_num = fHandle->curPagePos;
+		return readBlock(current_pg_num, fHandle, memPage);
+		return RC_OK;
+	
 }
 
 extern RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
+
+	if (fHandle == NULL)
+	{
+		return RC_READ_NON_EXISTING_PAGE;
+	}
+
+	int current_pg_num;
+		current_pg_num = fHandle->curPagePos;
+		return readBlock(current_pg_num + 1, fHandle, memPage);
+		return RC_OK;
+
 }
 
 extern RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
+	
+	int lastPageNum = fHandle->totalNumPages - 1; 
+	return readBlock(lastPageNum, fHandle, memPage);
 }
 
 extern RC writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
+
+	if (pageNum < 0 || fHandle->totalNumPages < (pageNum + 1)) {
+		return RC_READ_NON_EXISTING_PAGE;
+	}
+
+	long offset = pageNum * PAGE_SIZE * sizeof(char);
+
+	int seekTag = fseek(fHandle->mgmtInfo, offset, SEEK_SET);
+
+	
+	int writtenSize = fwrite(memPage, sizeof(char), PAGE_SIZE,
+		fHandle->mgmtInfo); // return size
+
+
+	fHandle->curPagePos;
+	fHandle = pageNum;
+
+	return RC_OK;
 }
 
 extern RC writeCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {

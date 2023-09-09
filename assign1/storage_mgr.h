@@ -40,4 +40,5 @@ extern RC writeCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage);
 extern RC appendEmptyBlock (SM_FileHandle *fHandle);
 extern RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle);
 
+extern RC renameFile (char *fileName,char *newFileName, SM_FileHandle *fHandle);
 #endif

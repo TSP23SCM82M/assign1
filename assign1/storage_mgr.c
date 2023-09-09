@@ -46,12 +46,13 @@ extern RC openPageFile (char *fileName, SM_FileHandle *fHandle) {
 	int totalPages=(int)(size/PAGE_SIZE);
 	fHandle->totalNumPages=totalPages;
 	fHandle->curPagePos=0;
-	fclose(pageFile);
+	//fclose(pageFile);
 	return RC_OK;
 
 }
 
 extern RC closePageFile (SM_FileHandle *fHandle) {
+	
 	fclose(pageFile);
     fHandle=NULL;
     return RC_OK;
@@ -68,7 +69,7 @@ extern RC destroyPageFile (char *fileName) {
 
 extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
-	if (pageNum < 0 || pageNum >= fHandle->totalNumPages) {
+	/*if (pageNum < 0 || pageNum >= fHandle->totalNumPages) {
 
         return RC_READ_NON_EXISTING_PAGE;
     }
@@ -76,25 +77,57 @@ extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
         
 		float bytesRead;
 		
-		fseek(openFile,pageNum*PAGE_SIZE, SEEK_SET);
+		fseek(pageFile,pageNum*PAGE_SIZE, SEEK_SET);
 		
-		bytesRead=fread(memPage,sizeof(char),PAGE_SIZE,openFile);
+		bytesRead=fread(memPage,sizeof(char),PAGE_SIZE,pageFile);
 		
 		
         if (bytesRead != PAGE_SIZE) {
-            if (feof(openFile)) {
+            if (feof(pageFile)) {
             // The requested page is not found because the end of the file has been reached.
                 return RC_READ_NON_EXISTING_PAGE;
             }      
-            else if (ferror(openFile)) {
+            else if (ferror(pageFile)) {
             // During the read operation an error occurred. So handle the error or return an appropriate error code.
-                return SOME_ERROR_CODE;
+                return RC_READ_NON_EXISTING_PAGE;
             }
         }
 
 		fHandle->curPagePos=pageNum;
 		return RC_OK;
         
+		}
+	}
+*/
+
+	if(fHandle->totalNumPages<pageNum){
+		return RC_READ_NON_EXISTING_PAGE;
+
+	}
+	else if(pageNum<0){
+		return RC_READ_NON_EXISTING_PAGE;
+
+	}
+	else{
+		float read;
+		
+		fseek(pageFile,pageNum*PAGE_SIZE, SEEK_SET);
+		
+		read=fread(memPage,sizeof(char),PAGE_SIZE,pageFile);
+		
+		
+		if(read>PAGE_SIZE){
+			return RC_READ_NON_EXISTING_PAGE;
+
+		}
+		else if(read<PAGE_SIZE){
+			return RC_READ_NON_EXISTING_PAGE;
+
+		}
+		
+		fHandle->curPagePos=pageNum;
+		return RC_OK;
+
 		}
 	}
 
@@ -128,12 +161,14 @@ extern RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
         } else {
             return result; // Return the error code if failed
         }
+	}
+
 	// If the page is not found, returns an error
 	else
 	{
 		return RC_READ_NON_EXISTING_PAGE;
 	}
-}
+
 }
 
 extern RC readPreviousBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
@@ -256,7 +291,7 @@ extern RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle) {
 	
 	int totalNum = fHandle->totalNumPages;
 	int neededNum = numberOfPages - totalNum;
-	if (int i = 0; i < neededNum; i++) {
+	for (int i = 0; i < neededNum; i++) {
 		// Append empty to the block to ensure enough capacity.
 		appendEmptyBlock(fHandle);
 	}
@@ -264,4 +299,3 @@ extern RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle) {
 	fclose(pageFile);
 	return RC_OK;
 }
-

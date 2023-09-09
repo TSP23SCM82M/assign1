@@ -20,6 +20,8 @@ static void testSinglePageContent(void);
 /* new test cases for checking multiple page content */
 static void testMultiplePageContent(void);
 
+static void testAddedFunc(void);
+
 /* main function running all tests */
 int
 main (void)
@@ -103,6 +105,15 @@ testSinglePageContent(void)
   TEST_CHECK(destroyPageFile (TESTPF));  
   
   TEST_DONE();
+}
+
+/* check for the added functions */
+void
+testAddedFunc(void)
+{
+  SM_FileHandle fh;
+  TEST_CHECK(renameFile (TESTPF, "New File", &fh));
+  ASSERT_TRUE(strcmp(fh.fileName, "New File") == 0, "new filename correct");
 }
 
 /** this test function is we added to check multiple page content */

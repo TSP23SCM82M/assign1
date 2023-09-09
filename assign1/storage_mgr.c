@@ -183,6 +183,17 @@ extern RC readCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
 	
 }
 
+extern RC renameFile (char *fileName,char *newFileName, SM_FileHandle *fHandle){
+	textFile=fopen(fileName,"r+");
+	 if(textFile == NULL)
+	{
+        return RC_FILE_NOT_FOUND;
+	}
+	fHandle->fileName=newFileName;
+	return RC_OK;
+
+}
+
 extern RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
 
 	if (fHandle == NULL)

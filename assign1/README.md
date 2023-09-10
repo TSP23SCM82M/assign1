@@ -26,6 +26,24 @@ After build, you can use this command to run this project.
 
 ## Function explain
 
+**extern void initStorageManager ( void );**
+
+**extern RC createPageFile ( char * fileName );**
+
+This function is used to create a new file with the name fileName. The file is opened using fopen() C function in write mode.  It allocates memory for a blank page using malloc, and initializes the memory with '\0' bytes using memset(). It verifies if the number of bytes written matches the expected page size and returns an error code if they do not match. Finally,it closes the file, deallocates memory and returns RC_OK.
+
+**extern RC openPageFile ( char * fileName , SM_FileHandle * fHandle );**
+
+This function opens the page file specified by fileName using the fopen() C function in read and write mode. If the file doesn't exist, RC FILE NOT FOUND is returned. fseek() is used the file pointer to the end of the file and calculate the total number of pages. Fields of the file handle are initialized with the information about the opened file.
+
+
+**extern RC closePageFile ( SM_FileHandle * fHandle );**\
+
+This function closes the page file using the fclose() function and sets the file handle to NULL. 
+
+**extern RC destroyPageFile ( char * fileName );**
+
+This function is used to delete a file specified by filename. It checks if fileName exists in memory and, if it does, deletes it using the remove function. 
 
 **extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage);**
 
@@ -43,6 +61,22 @@ Using the file handle, get the first block from the file, then place it inside t
 
 Using the file handle, get the previous block from the file and save it in the memPage page. Check to see if the file handle contains the previous block. Return an error indicating a non-existent page if it is missing. But if it does, take it out of the fHandle data structure and put the current file location in the cur_page_num variable. To read the file's previous page, call the readBlock function with the parameter cur_page_num - 1.
 
+**extern RC readCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage);**
+
+Using the file handle, get the current block from the file and save it in the memPage page. Check to see if the file handle contains the current block. Return an error indicating a non-existent page if it is missing. But if it does, take it out of the fHandle data structure and put the current file location in the cur_page_num variable. To read the file's current page, call the readBlock function with the parameter cur_page_num.
+
+**extern RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage);**
+
+Using the file handle, get the next block from the file and save it in the memPage page. Check to see if the file handle contains the next block. Return an error indicating a non-existent page if it is missing. But if it does, take it out of the fHandle data structure and put the current file location in the cur_page_num variable. To read the file's next page, call the readBlock function with the parameter cur_page_num + 1.
+
+**extern RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage);**
+
+Using the file handle, get the last block from the file and save it in the memPage page. Check to see if the file handle contains the last block. Return an error indicating a non-existent page if it is missing. But if it does, store the fHandle->totalNumPages - 1 in lastPageNum. To read the file's last page, call the readBlock function with the parameter lastPageNum.
+
+**extern RC writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage);**
+
+This function writes a page of data (specified by memPage) to a specific page (pageNum) within a file. If pageNum is negative or pageNum exceeds the total number of pages, error is returned. The byte offset where the data should be written is calculated and fseek is used to position the file pointer to that location. If fseek() issuccessful, the content is stored in memPage.
+
 **extern RC writeCurrentBlock (SM_FileHandle \*fHandle, SM_PageHandle memPage);**
 
 This is function receives 2 parameters, the first one is the filehandle, and the second one is memPage.
@@ -57,6 +91,12 @@ This is function just append an empty block to pagefile, and add the total page 
 
 This function receives two parameters, the first one is the required page number, and the second one is the file handler which can get from createPageFile.
 This function ensures the capacity of pageFile, when the current page number of pageFile is less than the required page number, then the function will add some empty blocks to make sure the capacity.
+
+## Additional Functions added
+
+**extern RC renameFile (char *fileName,char *newFileName, SM_FileHandle *fHandle);**
+
+This function is used to rename the file name specified by fileName to newFileName using the rename() C function. The file handle's fileName is also initialized with the newFileName.
 
 ## Test explain
 

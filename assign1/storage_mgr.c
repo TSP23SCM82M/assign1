@@ -12,60 +12,96 @@ extern void initStorageManager (void) {
 }
 
 extern RC createPageFile (char *fileName) {
+	
 	char * memory;
+	//Open file in write mode 
 	textFile=fopen(fileName,"w");
 	
-    
+	//Check if the file opened successfully
     if(textFile == NULL)
 	{
         return RC_FILE_NOT_FOUND;
 	}
 
-	else{
-        memory=(char*)malloc(PAGE_SIZE);
-        memset(memory, '\0', PAGE_SIZE); 
-		size_t no_of_bytes=fwrite(memory, 1 , PAGE_SIZE, textFile);	
-		if(no_of_bytes!=PAGE_SIZE)
-		{
-			return RC_WRITE_FAILED;	
-		}
-		free(memory);		
-		fclose(textFile);			
-		return RC_OK;
+	//Allocate memory using malloc() with size of PAGE_SIZE
+     memory=(char*)malloc(PAGE_SIZE);
+
+	//Initialize memory with null bytes
+    memset(memory, '\0', PAGE_SIZE);
+
+	//Store the number of bytes written in no_of_bytes
+	size_t no_of_bytes=fwrite(memory, 1 , PAGE_SIZE, textFile);	
+
+	//Check if the number of bytes written matches the expected page size. If it does not match, return RC_WRITE_FAILED
+	if(no_of_bytes!=PAGE_SIZE)
+	{
+		return RC_WRITE_FAILED;	
 	}
+
+	//Free the allocated memory
+	free(memory);
+
+	//Close the file		
+	fclose(textFile);	
+
+	return RC_OK;
+	
 }
 
 extern RC openPageFile (char *fileName, SM_FileHandle *fHandle) {
+
+	//Open fileName in read and write(r+) mode
 	textFile=fopen(fileName,"r+");
+
+	//Check if file opens successfully
 	 if(textFile == NULL)
 	{
         return RC_FILE_NOT_FOUND;
 	}
+
+	//Initialize the file handle fields
+
 	fHandle->fileName=fileName;
+
 	fHandle->mgmtInfo=textFile;
+
 	fseek(textFile,0,SEEK_END);
+
 	long size=ftell(textFile);
+
 	int totalPages=(int)(size/PAGE_SIZE);
+
 	fHandle->totalNumPages=totalPages;
+
 	fHandle->curPagePos=0;
-	//fclose(textFile);
+
 	return RC_OK;
 
 }
 
 extern RC closePageFile (SM_FileHandle *fHandle) {
 	
+	//Close the textFile using fclose()
 	fclose(textFile);
-    fHandle=NULL;
+    
+    // Set fHandle to NULL
+    fHandle = NULL;
+    
     return RC_OK;
 }
 
 
 extern RC destroyPageFile (char *fileName) {
-	if (textFile==NULL){
+	
+	//Check whether textFile exists
+	if (textFile==NULL)
+	{
         return RC_FILE_NOT_FOUND;
     }
+
+	//delete the textFile using remove() function
     remove(fileName);
+
     return RC_OK;
 }
 
@@ -162,58 +198,86 @@ extern RC readPreviousBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
 extern RC readCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
+	// If the file handle is NULL, return an error 
 	if (fHandle == NULL)
 	{
 		return RC_READ_NON_EXISTING_PAGE;
 	}
 	
-
+	/*If the file handle is not null, this method reads the file handle's position and stores it in 'curPagePos.' 
+    'cur_page_num' holds the current block position value, and the 'readblock' function returns the current block position*/
 	int cur_page_num;
-		cur_page_num = fHandle->curPagePos;
-		return readBlock(cur_page_num, fHandle, memPage);
-		return RC_OK;
+	cur_page_num = fHandle->curPagePos;
+	return readBlock(cur_page_num, fHandle, memPage);
+	return RC_OK;
 	
 }
 
 extern RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
 
+	// If the file handle is NULL, return an error 
 	if (fHandle == NULL)
 	{
 		return RC_READ_NON_EXISTING_PAGE;
 	}
 	
-		int cur_page_num;
-		cur_page_num = fHandle->curPagePos;
-
-		return readBlock(cur_page_num + 1, fHandle, memPage);
-		return RC_OK;
+	/*If the file handle is not null, this method reads the file handle's position and stores it in 'curPagePos.' 
+    'cur_page_num' holds the current block position value, and the 'readblock' function returns the next block position*/
+	int cur_page_num;
+	cur_page_num = fHandle->curPagePos;
+	return readBlock(cur_page_num + 1, fHandle, memPage); // cur_page_num + 1 i.e. next block position
+	return RC_OK;
 	
 }
 
 extern RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
-	
-	int lastPageNum = fHandle->totalNumPages - 1; 
+
+	// If the file handle is NULL, return an error 
+	if (fHandle == NULL)
+	{
+		return RC_READ_NON_EXISTING_PAGE;
+	}
+
+	/*If the file handle is not null, lastPageNum holds the last block position value and the 'readblock' function returns the last block position*/
+	int lastPageNum = fHandle->totalNumPages - 1; //lastPageNum holds the last block position
 	return readBlock(lastPageNum, fHandle, memPage);
 }
 
 extern RC writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
-	if (pageNum < 0 || fHandle->totalNumPages < (pageNum + 1)) {
+	// If pageNum is negative or pageNum exceeds the total number of pages, return an error
+	if (pageNum < 0 || fHandle->totalNumPages < pageNum ) {
 		return RC_READ_NON_EXISTING_PAGE;
 	}
 
+	textFile = fopen(fHandle->fileName, "r");
+
+	if(textFile==NULL)
+	{
+		return RC_FILE_NOT_FOUND;
+	}
+
+	//calculate the byte offset where the data should be written and use fseek to position the file pointer to that location
 	long offset = pageNum * PAGE_SIZE * sizeof(char);
 
-	int seekTag = fseek(fHandle->mgmtInfo, offset, SEEK_SET);
-
+	int seekTag = fseek(textFile, offset, SEEK_SET);
 	
-	int writtenSize = fwrite(memPage, sizeof(char), PAGE_SIZE,
-		fHandle->mgmtInfo); // return size
+	//If fseek() issuccessful, read the content and store it in memPage
+	if(seekTag==0)
+	{
+	fread(memPage, sizeof(char), PAGE_SIZE,textFile); // return size
+	}
+	else
+	{
+		return RC_READ_NON_EXISTING_PAGE;
+	}
 
+	//Set the current page position using ftell()
+	fHandle->curPagePos=ftell(textFile);
 
-	fHandle->curPagePos;
-	fHandle = pageNum;
-
+	//Close the file 
+	fclose(textFile);
+	
 	return RC_OK;
 }
 
@@ -275,12 +339,22 @@ extern RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle) {
 //Additional Rename Function
 
 extern RC renameFile (char *fileName,char *newFileName, SM_FileHandle *fHandle){
+
+	//Open fileName in read and write mode
 	textFile=fopen(fileName,"r+");
+
+	//Check if textFile was opened successfully
 	 if(textFile == NULL)
 	{
         return RC_FILE_NOT_FOUND;
 	}
+
+	//Rename the fileName using rename() function
+	rename(fileName, newFileName);
+
+	//Change the fHandle->fileName to the newFileName
 	fHandle->fileName=newFileName;
+
 	return RC_OK;
 
 }

@@ -123,14 +123,6 @@ extern int getBlockPos (SM_FileHandle *fHandle) {
 
 extern RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
-// If the file handle is not null, using readblock, first block is read
-    //Also returns an OK message  
-    /*if (fHandle != NULL) {
-        
-		return readBlock(0, fHandle, memPage); // Reads the first block
-        return RC_OK; 
-        
-	}*/
 
 	if (fHandle != NULL) {
         RC result = readBlock(0, fHandle, memPage); // Reads the first block
@@ -158,12 +150,12 @@ extern RC readPreviousBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
 	}
 
 	/*If the file handle is not null, this method reads the file handle's position and stores it in 'curPagePos.' 
-    'current_pg_num' holds the current block position value, and the 'readblock' function returns the previous block position*/
+    'cur_page_num' holds the current block position value, and the 'readblock' function returns the previous block position*/
 	else
 	{
-		int current_pg_num;
-		current_pg_num = fHandle->curPagePos;
-		return readBlock(current_pg_num - 1, fHandle, memPage); // current_pg_num - 1 i.e. previous block position
+		int cur_page_num;
+		cur_page_num = fHandle->curPagePos;
+		return readBlock(cur_page_num - 1, fHandle, memPage); // cur_page_num - 1 i.e. previous block position
 		return RC_OK;
 	}
 }
@@ -176,9 +168,9 @@ extern RC readCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
 	}
 	
 
-	int current_pg_num;
-		current_pg_num = fHandle->curPagePos;
-		return readBlock(current_pg_num, fHandle, memPage);
+	int cur_page_num;
+		cur_page_num = fHandle->curPagePos;
+		return readBlock(cur_page_num, fHandle, memPage);
 		return RC_OK;
 	
 }
@@ -190,10 +182,10 @@ extern RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
 		return RC_READ_NON_EXISTING_PAGE;
 	}
 	
-		int current_pg_num;
-		current_pg_num = fHandle->curPagePos;
+		int cur_page_num;
+		cur_page_num = fHandle->curPagePos;
 
-		return readBlock(current_pg_num + 1, fHandle, memPage);
+		return readBlock(cur_page_num + 1, fHandle, memPage);
 		return RC_OK;
 	
 }
@@ -279,6 +271,8 @@ extern RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle) {
 	fclose(textFile);
 	return RC_OK;
 }
+
+//Additional Rename Function
 
 extern RC renameFile (char *fileName,char *newFileName, SM_FileHandle *fHandle){
 	textFile=fopen(fileName,"r+");

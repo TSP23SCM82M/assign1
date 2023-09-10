@@ -45,19 +45,19 @@ This function closes the page file using the fclose() function and sets the file
 
 This function is used to delete a file specified by filename. It checks if fileName exists in memory and, if it does, deletes it using the remove function. 
 
-**extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage);**
+**extern RC readBlock (int pageNum, SM_FileHandle \*fHandle, SM_PageHandle memPage);**
 
 This function is used for reading the content from page. "pageNum" tell us which page we want to read. Initially we check if the page we want to seek is valid, i.e. if it exists or not. Then we go to the required location using fseek and valid pointer. Then we read data from the page to buffer "mempage".
 
-**extern int getBlockPos (SM_FileHandle *fHandle);**
+**extern int getBlockPos (SM_FileHandle \*fHandle);**
 
 This function is used to get the current block position that we get back from FileHandle's curPagePos.
 
-**extern RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage);**
+**extern RC readFirstBlock (SM_FileHandle \*fHandle, SM_PageHandle memPage);**
 
 Using the file handle, get the first block from the file, then place it inside the memPage page. The readBlock function is called with a parameter value of 0 to retrieve the first page in the file. If the first block is missing from the file handle, an error will be raised.
 
-**extern RC readPreviousBlock (SM_FileHandle *fHandle, SM_PageHandle memPage);**
+**extern RC readPreviousBlock (SM_FileHandle \*fHandle, SM_PageHandle memPage);**
 
 Using the file handle, get the previous block from the file and save it in the memPage page. Check to see if the file handle contains the previous block. Return an error indicating a non-existent page if it is missing. But if it does, take it out of the fHandle data structure and put the current file location in the cur_page_num variable. To read the file's previous page, call the readBlock function with the parameter cur_page_num - 1.
 

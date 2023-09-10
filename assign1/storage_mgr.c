@@ -246,37 +246,20 @@ extern RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
 extern RC writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
 	// If pageNum is negative or pageNum exceeds the total number of pages, return an error
-	if (pageNum < 0 || fHandle->totalNumPages < pageNum ) {
+   if (pageNum < 0 || fHandle->totalNumPages < (pageNum + 1)) {
 		return RC_READ_NON_EXISTING_PAGE;
 	}
-
-	textFile = fopen(fHandle->fileName, "r");
-
-	if(textFile==NULL)
-	{
-		return RC_FILE_NOT_FOUND;
-	}
-
+	
 	//calculate the byte offset where the data should be written and use fseek to position the file pointer to that location
 	long offset = pageNum * PAGE_SIZE * sizeof(char);
-
-	int seekTag = fseek(textFile, offset, SEEK_SET);
 	
-	//If fseek() issuccessful, read the content and store it in memPage
-	if(seekTag==0)
-	{
-	fread(memPage, sizeof(char), PAGE_SIZE,textFile); // return size
-	}
-	else
-	{
-		return RC_READ_NON_EXISTING_PAGE;
-	}
-
-	//Set the current page position using ftell()
-	fHandle->curPagePos=ftell(textFile);
-
-	//Close the file 
-	fclose(textFile);
+	int seekTag = fseek(fHandle->mgmtInfo, offset, SEEK_SET);
+	
+	int writtenSize = fwrite(memPage, sizeof(char), PAGE_SIZE, fHandle->mgmtInfo); // return size
+	
+	fHandle->curPagePos;
+	
+	fHandle = pageNum;
 	
 	return RC_OK;
 }

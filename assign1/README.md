@@ -132,4 +132,9 @@ Destroys the new page file (cleanup). Test Completion (TEST_DONE):
 **testAddedFunc(void)**
 This test is to check rename function. It uses string compare and returns true if filename matches to newfile name.
 
+**Team Members**
+Anwesha Nayak(A20512145): 25%
+Taufeeq Ahmed Mohammed(A20512082): 25%
+Shruti Shankar Shete(A20518508): 25%
+Jianqi Jin: 25%
 

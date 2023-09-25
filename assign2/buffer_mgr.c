@@ -256,7 +256,7 @@ RC markDirty(BM_BufferPool *const bm, BM_PageHandle *const page)
 		if (buffers[i].pageNum == page->pageNum)
 		{
 			// Mark the page as dirty
-			buffers[i].dirty = 1;
+			buffers[i].dirtyFlag = 1;
 			return RC_OK;
 		}
 	}
@@ -264,15 +264,15 @@ RC markDirty(BM_BufferPool *const bm, BM_PageHandle *const page)
 
 RC unpinPage(BM_BufferPool *const bm, BM_PageHandle *const page)
 {
-
+	PageFrame *buffers = bm->mgmtData;
 	for (int i = 0; i < bm->numPages; i++)
 	{
-		if (PageFrame[i].pageNum == page->pageNum)
+		if (buffers[i].pageNum == page->pageNum)
 		{
 			// Decrease the fix count
-			if (PageFrame[i].fixCount > 0)
+			if (buffers[i].fixCount > 0)
 			{
-				pageFrame[i].fixCount--;
+				buffers[i].fixCount--;
 				return RC_OK;
 			}
 		}
@@ -332,14 +332,14 @@ RC pinPage(BM_BufferPool *const bm, BM_PageHandle *const page,
 			return RC_OK;
 		}
 	}
-	PageFrame *newPage;
+	PageFrame tmpPage;
 
-	readFromSMBlock(bm, newPage, page, pageNum);
-	newPage->clockFlag = 1;
-	newPage->fixCount = 1;
-	newPage->lastUsedTimeStamp = ++timeStamp;
-	newPage->totalCount = 1;
-	newPage->pageNum = pageNum;
+	readFromSMBlock(bm, tmpPage, page, pageNum);
+	tmpPage.clockFlag = 1;
+	tmpPage.fixCount = 1;
+	tmpPage.lastUsedTimeStamp = ++timeStamp;
+	tmpPage.totalCount = 1;
+	tmpPage.pageNum = pageNum;
 	// Page not found in the buffer pool, need to load it from disk
 	openPageFile(bm->pageFile, &fileHandle);
 
@@ -360,28 +360,28 @@ RC pinPage(BM_BufferPool *const bm, BM_PageHandle *const page,
 		switch (bm->strategy)
 		{
 		case RS_FIFO:
-			FIFO(bm, newPage, page, pageNum);
+			FIFO(bm, tmpPage);
 
 			break;
 		case RS_LFU:
-			LFU(bm, newPage, page, pageNum);
+			LFU(bm, tmpPage);
 
 			break;
 		case RS_LRU:
-			LRU(bm, newPage, page, pageNum);
+			LRU(bm, tmpPage);
 			break;
 		case RS_CLOCK:
-			CLOCK(bm, newPage, page, pageNum);
+			CLOCK(bm, tmpPage);
 			break;
 		default:
-			FIFO(bm, newPage, page, pageNum);
+			FIFO(bm, tmpPage);
 		}
 	}
 	else
 	{
 		// Found an empty frame, load the page into it
 
-		frames[emptyFrameIndex] = newPage;
+		frames[emptyFrameIndex] = tmpPage;
 	}
 
 	closePageFile(&fileHandle);
@@ -454,7 +454,7 @@ extern bool *getDirtyFlags(BM_BufferPool *const bm)
 	// Use for loop to read all dirty and assign it to res.
 	for (int curIndex = 0; curIndex < bufferSize; curIndex++)
 	{
-		resIsDirty[curIndex] = !!(frames[curIndex].dirtyFlag == 1);
+		resIsDirty[curIndex] = !!(buffers[curIndex].dirtyFlag == 1);
 	}
 	// Return the dirty results.
 	return resIsDirty;

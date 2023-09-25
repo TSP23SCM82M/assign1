@@ -24,113 +24,136 @@ This is run the default command, which is "test1".
 After build, you can use this command to run this project.
 
 
-## Function explain
+**Replacement Strategies**
 
-**extern void initStorageManager ( void );**
+*First-In-First-Out (FIFO)*
 
-**extern RC createPageFile ( char * fileName );**
+Like a queue, FIFO operates. It determines whether the desired page is already present in the buffer pool, which is temporary memory for pages.
 
-This function is used to create a new file with the name fileName. The file is opened using fopen() C function in write mode.  It allocates memory for a blank page using malloc, and initializes the memory with '\0' bytes using memset(). It verifies if the number of bytes written matches the expected page size and returns an error code if they do not match. Finally,it closes the file, deallocates memory and returns RC_OK.
+If the page is already in the buffer pool, it is returned to us, and the number of "pins" (which represents how frequently this page is accessed) increases.
 
-**extern RC openPageFile ( char * fileName , SM_FileHandle * fHandle );**
+It searches for an open space in the buffer pool if the page is not already there.
 
-This function opens the page file specified by fileName using the fopen() C function in read and write mode. If the file doesn't exist, RC FILE NOT FOUND is returned. fseek() is used the file pointer to the end of the file and calculate the total number of pages. Fields of the file handle are initialized with the information about the opened file.
+If it comes to an empty area, it fills it up by reading the desired page from the disk and inserting it there.
 
+Before inserting the new page, it writes the altered page back to the disk if the place it's utilizing was previously holding a separate page that was changed (dirty).
 
-**extern RC closePageFile ( SM_FileHandle * fHandle );**\
+*Least Recently Used (LRU)*
 
-This function closes the page file using the fclose() function and sets the file handle to NULL. 
+LRU is a technique that swaps out the buffer pool page that hasn't been used in the longest.
 
-**extern RC destroyPageFile ( char * fileName );**
+Imagine that the buffer pool's pages are organized from most recently used at one end to least recently used at the other, in order of when they were last used.
 
-This function is used to delete a file specified by filename. It checks if fileName exists in memory and, if it does, deletes it using the remove function. 
+Prior to inserting the new page, LRU selects the page that had the least recently utilized end and writes it to the disk.
 
-**extern RC readBlock (int pageNum, SM_FileHandle \*fHandle, SM_PageHandle memPage);**
+*Clock*
 
-This function is used for reading the content from page. "pageNum" tell us which page we want to read. Initially we check if the page we want to seek is valid, i.e. if it exists or not. Then we go to the required location using fseek and valid pointer. Then we read data from the page to buffer "mempage".
+CLOCK determines whether the desired page is already present in the buffer pool.
 
-**extern int getBlockPos (SM_FileHandle \*fHandle);**
+If it's there, it lets us know about it and raises the pin count, which shows that it's in use.
 
-This function is used to get the current block position that we get back from FileHandle's curPagePos.
+If not, it searches for a free space in the pool to use.
+If it locates an empty space, it fills it with the desired page from the disk.
 
-**extern RC readFirstBlock (SM_FileHandle \*fHandle, SM_PageHandle memPage);**
+Importantly, CLOCK uses a reference bit to keep track of whether or not each page in the pool has recently been accessed.
 
-Using the file handle, get the first block from the file, then place it inside the memPage page. The readBlock function is called with a parameter value of 0 to retrieve the first page in the file. If the first block is missing from the file handle, an error will be raised.
+It clears the reference bit and searches for the next page if it needs to replace a page and discovers one that has a reference bit set, indicating that it has recently been used.
 
-**extern RC readPreviousBlock (SM_FileHandle \*fHandle, SM_PageHandle memPage);**
+Until it finds a page that doesn't have the reference bit set, indicating that it hasn't been used recently, it continues doing this and replaces that page with the new one.
 
-Using the file handle, get the previous block from the file and save it in the memPage page. Check to see if the file handle contains the previous block. Return an error indicating a non-existent page if it is missing. But if it does, take it out of the fHandle data structure and put the current file location in the cur_page_num variable. To read the file's previous page, call the readBlock function with the parameter cur_page_num - 1.
+*initBufferPool*
 
-**extern RC readCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage);**
+A new memory area, which we refer to as a buffer pool, is created up by initBufferPool with a predetermined number of page slots.
 
-Using the file handle, get the current block from the file and save it in the memPage page. Check to see if the file handle contains the current block. Return an error indicating a non-existent page if it is missing. But if it does, take it out of the fHandle data structure and put the current file location in the cur_page_num variable. To read the file's current page, call the readBlock function with the parameter cur_page_num.
+At first, no new pages are created and all the slots are null. It's similar to clearing up parking spots in a lot for automobiles but there aren't any cars there yet.
 
-**extern RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage);**
+This process uses dynamic memory allocation to build the buffer pool.
 
-Using the file handle, get the next block from the file and save it in the memPage page. Check to see if the file handle contains the next block. Return an error indicating a non-existent page if it is missing. But if it does, take it out of the fHandle data structure and put the current file location in the cur_page_num variable. To read the file's next page, call the readBlock function with the parameter cur_page_num + 1.
+*shutdownBufferPool*
 
-**extern RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage);**
+shutdownBufferPool is responsible for closing down and cleaning up a buffer pool.
 
-Using the file handle, get the last block from the file and save it in the memPage page. Check to see if the file handle contains the last block. Return an error indicating a non-existent page if it is missing. But if it does, store the fHandle->totalNumPages - 1 in lastPageNum. To read the file's last page, call the readBlock function with the parameter lastPageNum.
+It effectively destroys the parking lot we previously created by releasing any resources and memory that the buffer pool was utilizing.
+This function resets the buffer manager variables after releasing resources, making it ready for potential future use.
 
-**extern RC writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage);**
+*forceFlushPool*
 
-This function writes a page of data (specified by memPage) to a specific page (pageNum) within a file. If pageNum is negative or pageNum exceeds the total number of pages, error is returned. The byte offset where the data should be written is calculated and fseek is used to position the file pointer to that location. If fseek() issuccessful, the content is stored in memPage.
+When a page in the buffer pool has been modified (i.e., has a "dirty" mark), forceFlushPool makes sure that it is written back to the disk.
+It's similar to saving any document edits you make before turning off your computer.
 
-**extern RC writeCurrentBlock (SM_FileHandle \*fHandle, SM_PageHandle memPage);**
+To ensure that everything is securely kept on the disk, this function entails opening an existing file on the disk, writing the altered pages back to that file, and then closing the file.
 
-This is function receives 2 parameters, the first one is the filehandle, and the second one is memPage.
-This function will write memPage to the page file that the file heandler points to. And after that add the currentPageNumber by 1.
+*markDirty*
 
-**extern RC appendEmptyBlock (SM_FileHandle \*fHandle);**
+If a page is marked as "dirty," it has been edited, and markDirty checks to see if that is the case.
 
-This is function receives 1 parameter, it's the file handler. We can use createPageFile function to get a file handler.
-This is function just append an empty block to pagefile, and add the total page number by 1.
+It searches the buffer pool for the frame containing this page.
 
-**extern RC ensureCapacity (int numberOfPages, SM_FileHandle \*fHandle);**
+When it locates the frame, it flags the page as "dirty," signifying that alterations have been performed.
 
-This function receives two parameters, the first one is the required page number, and the second one is the file handler which can get from createPageFile.
-This function ensures the capacity of pageFile, when the current page number of pageFile is less than the required page number, then the function will add some empty blocks to make sure the capacity.
+If the page cannot be located, an error is reported.
 
-## Additional Functions added
+It returns RC_OK, which denotes success if everything goes according to plan.
 
-**extern RC renameFile (char *fileName,char *newFileName, SM_FileHandle *fHandle);**
+*pinPage*
 
-This function is used to rename the file name specified by fileName to newFileName using the rename() C function. The file handle's fileName is also initialized with the newFileName.
+pinPage is a method used to make sure a specific page (identified by pageNum) is available for use in the buffer pool.
 
-## Test explain
+It applies logic based on LRU (Least Recently Used) and FIFO (First-In-First-Out) strategies to decide which page should be removed from the buffer pool if it's full or needs to make space.
 
-To check multiple page content:
-**static void testMultiplePageContent(void);**
+*unpinPage*
 
-Here we wrote test cases for:
+The "pin" (a marker indicating the page is being used) can be removed from a page using the unpinPage function.
+It makes sure the inputs are proper by first checking them.
 
-*Read First Block (readFirstBlock):*
-Reads the first page into the file handle.Verifies that the page is empty by checking for zero bytes. Prints a message indicating that the first block was empty.
+The frame in the buffer pool that matches the given page is then sought after.
 
-*Write First Block (writeBlock):*
-Writes the content of the page. Prints a message confirming the writing of the first block.
+If the "fixed count" (a count of the number of times the page has been pinned) is more than 0, the fixed count is decreased.
 
-*Read First Block Again (readFirstBlock):*
-Reads the first block from the file again. Checks that the content matches what was previously written.
+It returns RC_OK after removing the pin successfully.
 
-*Write Second Block (writeCurrentBlock):*
-Writes the content of the page. Prints a message confirming the writing of the second block.
+*forcePage*
 
-*Read Second Block (readCurrentBlock):*
-Reads the second block i.e. the current block from the file. Verifies that the content matches the second string.
+To ensure that changes are saved, the forcePage method writes the contents of a page back to the disk (the page file).
 
-*Reads the previous block from the file.*
-Verifies that the previous block content is read. 
+The current page should be written back to the disk if the page->pageNum matches the pageNum.
 
-*Ensure Capacity (ensureCapacity):*
-Attempts to ensure that the file has a capacity of at least 4 pages.
+The page is marked as not "dirty" after authoring it, indicating that it has not been edited since.
 
-*Destroy Page File (destroyPageFile):*
-Destroys the new page file (cleanup). Test Completion (TEST_DONE):
+Indicating that the page was successfully written back to the file on disk, it returns RC_OK.
 
-**testAddedFunc(void)**
-This test is to check rename function. It uses string compare and returns true if filename matches to newfile name.
+*getFrameContents*
+
+Accessing and reviewing the contents of a particular page frame is possible with the help of the getFrameContents function.
+
+It can be used to set a pointer that enables you to traverse the frame and access the value or information kept within.
+
+*getDirtyFlags*
+
+The getDirtyFlags function produces an array of boolean values when you call it.
+
+A page frame in the buffer pool is represented by each boolean value in the array.
+
+The page saved in the "i"-th frame is designated as "dirty," indicating that it has been updated, if the boolean at index "i" is TRUE.
+
+*getFixCounts*
+
+An array of integers is returned by the getFixCounts function.
+
+A page frame in the buffer pool is represented by each integer in the array.
+
+The fixed count of the page contained in the "i"-th frame is represented by the integer at index "i."
+
+How frequently the page has been pinned or is currently being used is shown by the fixed count.
+
+*getNumReadIO*
+
+You can find out how many pages have been read from the disk since a buffer pool was originally created by using the getNumReadIO method.
+
+*getNumWriteIO*
+
+It gives how many pages have been written to the page file (saved to the disk) since the buffer pool was established using the getNumWriteIO function.
+
 
 **Team Members**
 Anwesha Nayak(A20512145): 25%

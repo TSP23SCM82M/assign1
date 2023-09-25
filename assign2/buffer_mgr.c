@@ -16,24 +16,6 @@ typedef struct Page
 	int lastUsedTimeStamp; // used by LRU, when page is hitted, it updates the timestamp;
 } PageFrame;
 
-typedef struct BM_BufferPool
-{
-	char *pageFile;
-	int numPages; // pagenumber in storage manager
-	ReplacementStrategy strategy;
-	void *mgmtData; // use this one to store the bookkeeping info your buffer
-	// manager needs for a buffer pool
-	int readIOCount;  // Variable to track read I/O operations
-	int writeIOCount; // New variable to track write I/O operations
-
-} BM_BufferPool;
-
-typedef struct BM_PageHandle
-{
-	PageNumber pageNum;
-	char *data;
-} BM_PageHandle;
-
 PageFrame *bufferPool = NULL;
 int bufferSize = 0;
 int totalRead = 0;
@@ -44,7 +26,7 @@ int pointer = 0;
 // used for LRU when a page is hitted, the timeStamp will increased and set to that buffer page.
 int timeStamp = 0;
 
-void writeWhenDirty(BM_BufferPool *const bm, PageFrame curPage)
+extern void writeWhenDirty(BM_BufferPool *const bm, PageFrame curPage)
 {
 
 	if (curPage.dirtyFlag == 1)
@@ -57,10 +39,14 @@ void writeWhenDirty(BM_BufferPool *const bm, PageFrame curPage)
 	}
 }
 
-void FIFO(BM_BufferPool *const bm, PageFrame page)
+extern void FIFO(BM_BufferPool *const bm, PageFrame page)
 {
+
+	// printf("buffer is full \n");
+	// printf("bm->strategy %d \n", bm->strategy);
 	PageFrame *buffers = bm->mgmtData;
-	while (true)
+	int i = 0;
+	while (i < bufferSize)
 	{
 		if (pointer >= bufferSize)
 		{
@@ -69,6 +55,7 @@ void FIFO(BM_BufferPool *const bm, PageFrame page)
 		if (buffers[pointer].fixCount != 0)
 		{
 			pointer++;
+			i++;
 			continue;
 		}
 		writeWhenDirty(bm, buffers[pointer]);
@@ -78,7 +65,7 @@ void FIFO(BM_BufferPool *const bm, PageFrame page)
 	}
 }
 
-void LFU(BM_BufferPool *const bm, PageFrame page)
+extern void LFU(BM_BufferPool *const bm, PageFrame page)
 {
 	PageFrame *buffers = bm->mgmtData;
 	int minTotalCount = INT16_MAX;
@@ -90,7 +77,7 @@ void LFU(BM_BufferPool *const bm, PageFrame page)
 		{
 			break;
 		}
-		if (buffers[loopNum].fixCount = 0)
+		if (buffers[loopNum].fixCount == 0)
 		{
 			if (minTotalCount > buffers[loopNum].totalCount)
 			{
@@ -104,7 +91,7 @@ void LFU(BM_BufferPool *const bm, PageFrame page)
 	buffers[replaceIndex] = page;
 	buffers[replaceIndex].totalCount = 1;
 }
-void LRU(BM_BufferPool *const bm, PageFrame page)
+extern void LRU(BM_BufferPool *const bm, PageFrame page)
 {
 	PageFrame *buffers = bm->mgmtData;
 	int minLastUsedTimeStamp = INT16_MAX;
@@ -116,7 +103,7 @@ void LRU(BM_BufferPool *const bm, PageFrame page)
 		{
 			break;
 		}
-		if (buffers[loopNum].fixCount = 0)
+		if (buffers[loopNum].fixCount == 0)
 		{
 			if (minLastUsedTimeStamp > buffers[loopNum].lastUsedTimeStamp)
 			{
@@ -130,7 +117,7 @@ void LRU(BM_BufferPool *const bm, PageFrame page)
 	buffers[replaceIndex] = page;
 	buffers[replaceIndex].lastUsedTimeStamp = ++timeStamp;
 }
-void CLOCK(BM_BufferPool *const bm, PageFrame page)
+extern void CLOCK(BM_BufferPool *const bm, PageFrame page)
 {
 	PageFrame *buffers = bm->mgmtData;
 	while (true)
@@ -297,13 +284,14 @@ RC forcePage(BM_BufferPool *const bm, BM_PageHandle *const page)
 	return RC_FILE_NOT_FOUND; // Page not found in the buffer pool
 }
 
-void readFromSMBlock(BM_BufferPool *const bm, PageFrame curPage, BM_PageHandle *const page, PageNumber pageNum)
+void readFromSMBlock(BM_BufferPool *const bm, PageFrame *curPage, BM_PageHandle *const page, PageNumber pageNum)
 {
 	SM_FileHandle fileHandler;
 	openPageFile(bm->pageFile, &fileHandler);
-	curPage.pageData = (SM_PageHandle)malloc(PAGE_SIZE);
+	// curPage->pageData = (SM_PageHandle)malloc(PAGE_SIZE);
 	ensureCapacity(pageNum, &fileHandler);
-	readBlock(pageNum, &fileHandler, curPage.pageData);
+	readBlock(pageNum, &fileHandler, curPage->pageData);
+	closePageFile(&fileHandle);
 	totalRead++;
 }
 
@@ -332,16 +320,15 @@ RC pinPage(BM_BufferPool *const bm, BM_PageHandle *const page,
 			return RC_OK;
 		}
 	}
-	PageFrame tmpPage;
+	PageFrame *tmpPage = (PageFrame *)malloc(sizeof(PageFrame));
 
 	readFromSMBlock(bm, tmpPage, page, pageNum);
-	tmpPage.clockFlag = 1;
-	tmpPage.fixCount = 1;
-	tmpPage.lastUsedTimeStamp = ++timeStamp;
-	tmpPage.totalCount = 1;
-	tmpPage.pageNum = pageNum;
+	tmpPage->clockFlag = 1;
+	tmpPage->fixCount = 1;
+	tmpPage->lastUsedTimeStamp = ++timeStamp;
+	tmpPage->totalCount = 1;
+	tmpPage->pageNum = pageNum;
 	// Page not found in the buffer pool, need to load it from disk
-	openPageFile(bm->pageFile, &fileHandle);
 
 	// Find an empty frame or apply the replacement strategy
 	int emptyFrameIndex = -1;
@@ -353,38 +340,35 @@ RC pinPage(BM_BufferPool *const bm, BM_PageHandle *const page,
 			break;
 		}
 	}
-
 	if (emptyFrameIndex == -1)
 	{
 		// No empty frames, apply the replacement strategy based on bm->strategy
 		switch (bm->strategy)
 		{
 		case RS_FIFO:
-			FIFO(bm, tmpPage);
+			FIFO(bm, *tmpPage);
 
 			break;
 		case RS_LFU:
-			LFU(bm, tmpPage);
+			LFU(bm, *tmpPage);
 
 			break;
 		case RS_LRU:
-			LRU(bm, tmpPage);
+			LRU(bm, *tmpPage);
 			break;
 		case RS_CLOCK:
-			CLOCK(bm, tmpPage);
+			CLOCK(bm, *tmpPage);
 			break;
 		default:
-			FIFO(bm, tmpPage);
+			FIFO(bm, *tmpPage);
 		}
 	}
 	else
 	{
 		// Found an empty frame, load the page into it
-
-		frames[emptyFrameIndex] = tmpPage;
+		frames[emptyFrameIndex] = *tmpPage;
 	}
 
-	closePageFile(&fileHandle);
 	return RC_OK;
 }
 

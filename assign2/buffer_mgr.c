@@ -23,7 +23,8 @@ typedef struct BM_BufferPool {
 	void *mgmtData; // use this one to store the bookkeeping info your buffer
 	// manager needs for a buffer pool
 	int readIOCount; // Variable to track read I/O operations
-    int writeIOCount; // New variable to track write I/O operations
+	int writeIOCount; // New variable to track write I/O operations
+	
 } BM_BufferPool;
 
 typedef struct BM_PageHandle {
@@ -33,6 +34,7 @@ typedef struct BM_PageHandle {
 
 PageFrame *bufferPool = NULL;
 int bufferSize = 0;
+
 
 // The pointer is used for FIFO and CLOCK algroithm
 // it usually changes in a loop, when it greats bufferSize, it will equal to pointer % bufferSize
@@ -47,6 +49,7 @@ void writeWhenDirty(BM_BufferPool *const bm, PageFrame* buffers) {
 			SM_FileHandle *sph;
 			openPageFile(bm->pageFile, &sph);
 			writeBlock(buffers[pointer].pageNum, &sph, buffers[pointer].pageData);
+			bm->writeIOCount++;
 		}
 }
 
@@ -152,8 +155,10 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
 		bm->pageFile = (char *)pageFileName;
 		bm->numPages = numPages;
 		bm->strategy = strategy;
-		bm->mgmtData = NULL; 
+		bm->mgmtData = bufferPool; 
 		bufferSize = numPages;
+		bm->readIOCount=0;
+		bm->writeIOCount=0;
 		return RC_OK;
 	}
 
@@ -203,6 +208,7 @@ SM_FileHandle fileHandle;
 
             // Write the page data to the page file using writeBlock
 			rc = writeBlock(PageFrame[i].pageNum, &fileHandle, PageFrame[i].data);
+			bm->writeIOCount++;
             if (rc  != RC_OK) {
                 return rc;
             }
@@ -264,6 +270,7 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page){
 
                 // Write the page data to the page file using writeBlock
                 rc = writeBlock(pageFrames[i].pageNum, &fileHandle, pageFrames[i].data);
+				bm->writeIOCount++;
                 if (rc != RC_OK) {
                     closePageFile(&fileHandle); // Close the page file on error
                     return rc;
@@ -288,9 +295,76 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page){
 
 RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, 
 		const PageNumber pageNum){
+
+			PageFrame *frames = (PageFrame *)bm->mgmtData;
+    SM_FileHandle fileHandle;
+    RC rc;
+
+    // Check if buffer pool is initialized
+    // if (bm->pageFile == NULL) {
+    //     return RC_BUFFER_POOL_NOT_INITIALIZED;
+    // }
+
+
+    // Search for the page in the buffer pool
+    for (int i = 0; i < bufferSize; i++) {
+        if (frames[i].pageNum == pageNum) {
+            // Page found in buffer, update fixCount and return the data
+            frames[i].fixCount++;
+            page->pageNum = pageNum;
+            page->data = frames[i].pageData;
+            return RC_OK;
+        }
+    }
+
+    // Page not found in the buffer pool, need to load it from disk
+    openPageFile(bm->pageFile, &fileHandle);
+    
+    // Find an empty frame or apply the replacement strategy
+    int emptyFrameIndex = -1;
+    for (int i = 0; i < bufferSize; i++) {
+        if (frames[i].pageNum == NO_PAGE) {
+            emptyFrameIndex = i;
+            break;
+        }
+    }
+    if (emptyFrameIndex == -1) {
+        // No empty frames, apply the replacement strategy based on bm->strategy
+        switch (bm->strategy) {
+            case RS_FIFO:
+                FIFO(bm, frames, page, pageNum);
+				
+                break;
+            case RS_LFU:
+                LFU(bm, frames, page, pageNum);
+                break;
+            case RS_LRU:
+                LRU(bm, frames, page, pageNum);
+                break;
+            case RS_CLOCK:
+                CLOCK(bm, frames, page, pageNum);
+                break;
+            default:
+                FIFO(bm, frames, page, pageNum);
+        }
+    } else {
+        // Found an empty frame, load the page into it
+        rc = readBlock(pageNum, &fileHandle, frames[emptyFrameIndex].pageData);
+		bm->readIOCount++;
+        if (rc != RC_OK) {
+            closePageFile(&fileHandle);
+            return rc;
+        }
+        frames[emptyFrameIndex].pageNum = pageNum;
+        frames[emptyFrameIndex].fixCount = 1;
+        page->pageNum = pageNum;
+        page->data = frames[emptyFrameIndex].pageData;
+    }
+
+    closePageFile(&fileHandle);
+    return RC_OK;
 			
 		}
-
 
 
 extern PageNumber *getFrameContents (BM_BufferPool *const bm)

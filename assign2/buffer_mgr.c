@@ -6,14 +6,18 @@
 #include<stdlib.h>
 typedef struct Page
 {
+	SM_PageHandle pageData;
 	PageNumber pageNum;
 	int dirtyFlag;
 	int fixCount;
+	int totalCount; // Total pin number, used by LRU
+	int clockFlag; // used by CLOCK, 0 means we need replace it, 1 means pass by
+	int lastUsedTimeStamp; // used by LRU, when page is hitted, it updates the timestamp;
 } PageFrame;
 
 typedef struct BM_BufferPool {
 	char *pageFile;
-	int numPages;
+	int numPages; // pagenumber in storage manager
 	ReplacementStrategy strategy;
 	void *mgmtData; // use this one to store the bookkeeping info your buffer
 	// manager needs for a buffer pool
@@ -26,6 +30,103 @@ typedef struct BM_PageHandle {
 
 PageFrame *bufferPool = NULL;
 int bufferSize = 0;
+
+// The pointer is used for FIFO and CLOCK algroithm
+// it usually changes in a loop, when it greats bufferSize, it will equal to pointer % bufferSize
+int pointer = 0;
+// used for LRU when a page is hitted, the timeStamp will increased and set to that buffer page.
+int timeStamp = 0;
+
+
+void writeWhenDirty(BM_BufferPool *const bm, PageFrame* buffers) {
+
+		if (buffers[pointer].dirtyFlag == 1) {
+			SM_FileHandle *sph;
+			openPageFile(bm->pageFile, &sph);
+			writeBlock(buffers[pointer].pageNum, &sph, buffers[pointer].pageData);
+		}
+}
+
+void FIFO(BM_BufferPool *const bm, PageFrame page) {
+	PageFrame * buffers = bm->mgmtData;
+	while (true) {
+		if (pointer >= bufferSize) {
+			pointer = pointer % bufferSize;
+		}
+		if (buffers[pointer].fixCount != 0) {
+			pointer++;
+			continue;
+		}
+		writeWhenDirty(bm, buffers);
+		buffers[pointer] = page;
+		pointer++;
+		break;
+	}
+}
+
+void LFU(BM_BufferPool *const bm, PageFrame page) {
+	PageFrame * buffers = bm->mgmtData;
+	int minTotalCount = INT16_MAX;
+	int replaceIndex = 0;
+	int loopNum = 0;
+	while (true) {
+		if (loopNum >= bufferSize) {
+			break;
+		}
+		if (buffers[loopNum].fixCount = 0) {
+			if (minTotalCount > buffers[loopNum].totalCount) {
+				minTotalCount = buffers[loopNum].totalCount;
+				replaceIndex = loopNum;
+			}
+		}
+		loopNum++;
+	}
+	writeWhenDirty(bm, buffers);
+	buffers[replaceIndex] = page;
+	buffers[replaceIndex].totalCount = 1;
+}
+void LRU(BM_BufferPool *const bm, PageFrame page) {
+	PageFrame * buffers = bm->mgmtData;
+	int minLastUsedTimeStamp = INT16_MAX;
+	int replaceIndex = 0;
+	int loopNum = 0;
+	while (true) {
+		if (loopNum >= bufferSize) {
+			break;
+		}
+		if (buffers[loopNum].fixCount = 0) {
+			if (minLastUsedTimeStamp > buffers[loopNum].lastUsedTimeStamp) {
+				minLastUsedTimeStamp = buffers[loopNum].lastUsedTimeStamp;
+				replaceIndex = loopNum;
+			}
+		}
+		loopNum++;
+	}
+	writeWhenDirty(bm, buffers);
+	buffers[replaceIndex] = page;
+	buffers[replaceIndex].lastUsedTimeStamp = ++timeStamp;
+}
+void CLOCK(BM_BufferPool *const bm, PageFrame page) {
+	PageFrame * buffers = bm->mgmtData;
+	while (true) {
+		if (pointer >= bufferSize) {
+			pointer = pointer % bufferSize;
+		}
+		if (buffers[pointer].fixCount != 0) {
+			pointer++;
+			continue;
+		}
+		if (buffers[pointer].clockFlag != 0) {
+			buffers[pointer].clockFlag--;
+			continue;
+		}
+		writeWhenDirty(bm, buffers);
+		buffers[pointer] = page;
+		buffers[pointer].clockFlag = 1;
+		pointer++;
+		break;
+	}
+}
 
 RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName, 
 		const int numPages, ReplacementStrategy strategy,
@@ -82,39 +183,35 @@ RC shutdownBufferPool(BM_BufferPool *const bm){
 
 RC forceFlushPool(BM_BufferPool *const bm){
 
-// Check if the buffer pool is initialized
-    // if (bm->pageFile == NULL) {
-    //     return RC_BUFFER_POOL_NOT_INITIALIZED;
-    // }
+SM_FileHandle fileHandle;
+    RC rc;
+	rc = openPageFile(bm->pageFile, &fileHandle);
+
+    // Open the page file
+    if (rc != RC_OK) {
+        return rc;
+    }
 
     // Iterate through the page frames and write dirty pages back to disk
     for (int i = 0; i < bm->numPages; i++) {
         if (pageFrames[i].dirty == 1) {
-            // Write the dirty page back to the page file
-            FILE *file = fopen(bm->pageFile, "rb+");
-            if (file == NULL) {
-                return RC_FILE_NOT_FOUND;
-            }
+            // Calculate the byte offset where the data should be written
+            long offset = PageFrame[i].pageNum * PAGE_SIZE * sizeof(char);
 
-            // Seek to the correct position in the page file
-            if (fseek(file, pageFrames[i].pageNum * PAGE_SIZE, SEEK_SET) != 0) {
-                fclose(file);
-                //return RC_FILE_SEEK_ERROR;
-            }
-
-            // Write the page data to the page file
-            if (fwrite(pageFrames[i].data, sizeof(char), PAGE_SIZE, file) != PAGE_SIZE) {
-                fclose(file);
-                return RC_WRITE_FAILED;
+            // Write the page data to the page file using writeBlock
+			rc = writeBlock(PageFrame[i].pageNum, &fileHandle, PageFrame[i].data);
+            if (rc  != RC_OK) {
+                return rc;
             }
 
             // Update the page frame's dirty flag
             pageFrames[i].dirty = 0;
 
-            // Close the page file
-            fclose(file);
         }
     }
+
+    // Close the page file
+    closePageFile(fileHandle);
 
     return RC_OK;
 
@@ -140,7 +237,7 @@ RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page){
         if (PageFrame[i].pageNum == page->pageNum) {
             // Decrease the fix count
             if (PageFrame[i].fixCount > 0) {
-                pageFrames[i].fixCount--;
+                pageFrame[i].fixCount--;
                 return RC_OK;
             } 
         }
@@ -150,11 +247,45 @@ RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page){
 
 RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page){
 
+	// Iterate through the page frames and find the page to force to disk
+    for (int i = 0; i < bm->numPages; i++) {
+        if (PageFrame[i].pageNum == page->pageNum) {
+            // Check if the page is dirty
+            if (PageFrame[i].dirty == 1) {
+                // Open the page file
+                SM_FileHandle fileHandle;
+                RC rc = openPageFile(bm->pageFile, &fileHandle);
+                if (rc != RC_OK) {
+                    return rc;
+                }
+
+                // Write the page data to the page file using writeBlock
+                rc = writeBlock(pageFrames[i].pageNum, &fileHandle, pageFrames[i].data);
+                if (rc != RC_OK) {
+                    closePageFile(&fileHandle); // Close the page file on error
+                    return rc;
+                }
+
+                // Mark the page as clean
+                pageFrames[i].dirty = 0;
+
+                // Close the page file
+                rc = closePageFile(&fileHandle);
+                if (rc != RC_OK) {
+                    return rc;
+                }
+            }
+            return RC_OK; // Page found and processed
+        }
+    }
+
+    return RC_FILE_NOT_FOUND; // Page not found in the buffer pool
+
 }
 
 RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, 
 		const PageNumber pageNum){
-
+			
 		}
 
 
@@ -200,3 +331,5 @@ extern int *getFixCounts (BM_BufferPool *const bm) {
 	// return the results.
 	return res;
 }
+
+

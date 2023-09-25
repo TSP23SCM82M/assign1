@@ -146,7 +146,7 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
 		// Initialize the buffer pool
 		for (int i = 0; i < numPages; i++) {
 			bufferPool[i].pageNum = NO_PAGE;
-			bufferPool[i].data = (char *)malloc(PAGE_SIZE); // Allocate memory for page data
+			bufferPool[i].pageData = (char *)malloc(PAGE_SIZE); // Allocate memory for page data
 			bufferPool[i].dirtyFlag = 0;
 			bufferPool[i].fixCount = 0;
 		}
@@ -199,7 +199,6 @@ SM_FileHandle fileHandle;
     if (rc != RC_OK) {
         return rc;
     }
-
     // Iterate through the page frames and write dirty pages back to disk
     for (int i = 0; i < bm->numPages; i++) {
         if (pageFrames[i].dirty == 1) {
@@ -291,6 +290,14 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page){
 
     return RC_FILE_NOT_FOUND; // Page not found in the buffer pool
 
+}
+
+void readFromSMBlock(BM_BufferPool *const bm, PageFrame curPage, BM_PageHandle *const page, PageNumber pageNum) {
+	SM_FileHandle fileHandler;
+	openPageFile(bm->pageFile, &fileHandler);
+	curPage.pageData = (SM_PageHandle) malloc(PAGE_SIZE);
+	ensureCapacity(pageNum, &fileHandler);
+	readBlock(pageNum, &fileHandler, curPage.pageData);
 }
 
 RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, 

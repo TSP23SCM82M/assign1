@@ -34,8 +34,8 @@ typedef struct BM_PageHandle {
 
 PageFrame *bufferPool = NULL;
 int bufferSize = 0;
-
-
+int totalRead = 0;
+int totalWrite = 0;
 // The pointer is used for FIFO and CLOCK algroithm
 // it usually changes in a loop, when it greats bufferSize, it will equal to pointer % bufferSize
 int pointer = 0;
@@ -43,13 +43,13 @@ int pointer = 0;
 int timeStamp = 0;
 
 
-void writeWhenDirty(BM_BufferPool *const bm, PageFrame* buffers) {
+void writeWhenDirty(BM_BufferPool *const bm, PageFrame curPage) {
 
-		if (buffers[pointer].dirtyFlag == 1) {
+		if (curPage.dirtyFlag == 1) {
 			SM_FileHandle *sph;
 			openPageFile(bm->pageFile, &sph);
-			writeBlock(buffers[pointer].pageNum, &sph, buffers[pointer].pageData);
-			bm->writeIOCount++;
+			writeBlock(curPage.pageNum, &sph, curPage.pageData);
+			totalWrite++;
 		}
 }
 
@@ -63,7 +63,7 @@ void FIFO(BM_BufferPool *const bm, PageFrame page) {
 			pointer++;
 			continue;
 		}
-		writeWhenDirty(bm, buffers);
+		writeWhenDirty(bm, buffers[pointer]);
 		buffers[pointer] = page;
 		pointer++;
 		break;
@@ -87,7 +87,7 @@ void LFU(BM_BufferPool *const bm, PageFrame page) {
 		}
 		loopNum++;
 	}
-	writeWhenDirty(bm, buffers);
+	writeWhenDirty(bm, buffers[replaceIndex]);
 	buffers[replaceIndex] = page;
 	buffers[replaceIndex].totalCount = 1;
 }
@@ -108,7 +108,7 @@ void LRU(BM_BufferPool *const bm, PageFrame page) {
 		}
 		loopNum++;
 	}
-	writeWhenDirty(bm, buffers);
+	writeWhenDirty(bm, buffers[replaceIndex]);
 	buffers[replaceIndex] = page;
 	buffers[replaceIndex].lastUsedTimeStamp = ++timeStamp;
 }
@@ -126,7 +126,7 @@ void CLOCK(BM_BufferPool *const bm, PageFrame page) {
 			buffers[pointer].clockFlag--;
 			continue;
 		}
-		writeWhenDirty(bm, buffers);
+		writeWhenDirty(bm, buffers[pointer]);
 		buffers[pointer] = page;
 		buffers[pointer].clockFlag = 1;
 		pointer++;
@@ -157,8 +157,8 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
 		bm->strategy = strategy;
 		bm->mgmtData = bufferPool; 
 		bufferSize = numPages;
-		bm->readIOCount=0;
-		bm->writeIOCount=0;
+		totalRead = 0;
+		totalWrite = 0;
 		return RC_OK;
 	}
 
@@ -194,6 +194,7 @@ RC forceFlushPool(BM_BufferPool *const bm){
 SM_FileHandle fileHandle;
     RC rc;
 	rc = openPageFile(bm->pageFile, &fileHandle);
+	PageFrame * buffers = bm->mgmtData;
 
     // Open the page file
     if (rc != RC_OK) {
@@ -201,21 +202,21 @@ SM_FileHandle fileHandle;
     }
     // Iterate through the page frames and write dirty pages back to disk
     for (int i = 0; i < bm->numPages; i++) {
-        if (pageFrames[i].dirty == 1) {
-            // Calculate the byte offset where the data should be written
-            long offset = PageFrame[i].pageNum * PAGE_SIZE * sizeof(char);
+		writeWhenDirty(bm, buffers[i]);
+        // if (buffers[i].dirty == 1) {
+        //     // Calculate the byte offset where the data should be written
+        //     long offset = PageFrame[i].pageNum * PAGE_SIZE * sizeof(char);
 
-            // Write the page data to the page file using writeBlock
-			rc = writeBlock(PageFrame[i].pageNum, &fileHandle, PageFrame[i].data);
-			bm->writeIOCount++;
-            if (rc  != RC_OK) {
-                return rc;
-            }
+        //     // Write the page data to the page file using writeBlock
+		// 	rc = writeBlock(PageFrame[i].pageNum, &fileHandle, PageFrame[i].data);
+        //     if (rc  != RC_OK) {
+        //         return rc;
+        //     }
 
-            // Update the page frame's dirty flag
-            pageFrames[i].dirty = 0;
+        //     // Update the page frame's dirty flag
+        //     buffers[i].dirty = 0;
 
-        }
+        // }
     }
 
     // Close the page file
@@ -255,35 +256,12 @@ RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page){
 
 RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page){
 
+	PageFrame * buffers = bm->mgmtData;
 	// Iterate through the page frames and find the page to force to disk
     for (int i = 0; i < bm->numPages; i++) {
-        if (PageFrame[i].pageNum == page->pageNum) {
+        if (buffers[i].pageNum == page->pageNum) {
             // Check if the page is dirty
-            if (PageFrame[i].dirty == 1) {
-                // Open the page file
-                SM_FileHandle fileHandle;
-                RC rc = openPageFile(bm->pageFile, &fileHandle);
-                if (rc != RC_OK) {
-                    return rc;
-                }
-
-                // Write the page data to the page file using writeBlock
-                rc = writeBlock(pageFrames[i].pageNum, &fileHandle, pageFrames[i].data);
-				bm->writeIOCount++;
-                if (rc != RC_OK) {
-                    closePageFile(&fileHandle); // Close the page file on error
-                    return rc;
-                }
-
-                // Mark the page as clean
-                pageFrames[i].dirty = 0;
-
-                // Close the page file
-                rc = closePageFile(&fileHandle);
-                if (rc != RC_OK) {
-                    return rc;
-                }
-            }
+			writeWhenDirty(bm, buffers[i]);
             return RC_OK; // Page found and processed
         }
     }
@@ -298,6 +276,7 @@ void readFromSMBlock(BM_BufferPool *const bm, PageFrame curPage, BM_PageHandle *
 	curPage.pageData = (SM_PageHandle) malloc(PAGE_SIZE);
 	ensureCapacity(pageNum, &fileHandler);
 	readBlock(pageNum, &fileHandler, curPage.pageData);
+	totalRead++;
 }
 
 RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, 
@@ -312,7 +291,6 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
     //     return RC_BUFFER_POOL_NOT_INITIALIZED;
     // }
 
-
     // Search for the page in the buffer pool
     for (int i = 0; i < bufferSize; i++) {
         if (frames[i].pageNum == pageNum) {
@@ -323,8 +301,16 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
             return RC_OK;
         }
     }
+	PageFrame * newPage;
+	
 
-    // Page not found in the buffer pool, need to load it from disk
+	readFromSMBlock(bm,newPage,page, pageNum);
+	newPage->clockFlag = 1;
+    newPage->fixCount = 1;
+	newPage->lastUsedTimeStamp = ++timeStamp;
+	newPage->totalCount = 1;
+	newPage->pageNum = pageNum;
+	// Page not found in the buffer pool, need to load it from disk
     openPageFile(bm->pageFile, &fileHandle);
     
     // Find an empty frame or apply the replacement strategy
@@ -335,37 +321,31 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
             break;
         }
     }
+
     if (emptyFrameIndex == -1) {
         // No empty frames, apply the replacement strategy based on bm->strategy
         switch (bm->strategy) {
             case RS_FIFO:
-                FIFO(bm, frames, page, pageNum);
-				
+                FIFO(bm, newPage, page, pageNum);
+
                 break;
             case RS_LFU:
-                LFU(bm, frames, page, pageNum);
+                LFU(bm, newPage, page, pageNum);
+
                 break;
             case RS_LRU:
-                LRU(bm, frames, page, pageNum);
+                LRU(bm, newPage, page, pageNum);
                 break;
             case RS_CLOCK:
-                CLOCK(bm, frames, page, pageNum);
+                CLOCK(bm, newPage, page, pageNum);
                 break;
             default:
-                FIFO(bm, frames, page, pageNum);
+                FIFO(bm, newPage, page, pageNum);
         }
     } else {
         // Found an empty frame, load the page into it
-        rc = readBlock(pageNum, &fileHandle, frames[emptyFrameIndex].pageData);
-		bm->readIOCount++;
-        if (rc != RC_OK) {
-            closePageFile(&fileHandle);
-            return rc;
-        }
-        frames[emptyFrameIndex].pageNum = pageNum;
-        frames[emptyFrameIndex].fixCount = 1;
-        page->pageNum = pageNum;
-        page->data = frames[emptyFrameIndex].pageData;
+       
+        frames[emptyFrameIndex] = newPage;
     }
 
     closePageFile(&fileHandle);
@@ -373,6 +353,28 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
 			
 		}
 
+
+//Retrieve the number of read I/O operations for a given buffer manager.
+extern int getNumReadIO(BM_BufferPool *const bufferManager) {
+    // Check if bufferManager is NULL
+    if (bufferManager == NULL) {
+        return -1; // Return an error code or handle this case as needed
+    }
+
+    // Return the read I/O count from the bufferManager
+    return totalRead;
+}
+
+// Retrieve the number of write I/O operations for a given buffer manager.
+extern int getNumWriteIO(BM_BufferPool *const bufferManager) {
+    // Check if bufferManager is NULL
+    if (bufferManager == NULL) {
+        return -1; // Return an error code or handle this case as needed
+    }
+
+    // Return the write I/O count from the bufferManager
+    return totalWrite;
+}
 
 extern PageNumber *getFrameContents (BM_BufferPool *const bm)
 {
@@ -388,19 +390,6 @@ extern PageNumber *getFrameContents (BM_BufferPool *const bm)
 	return res;
 }
 
-extern bool *getDirtyFlags (BM_BufferPool *const bm)
-{
-	PageFrame *frames = (PageFrame *)bm->mgmtData;
-	// resIsDirty is an array indicates all dirty flags
-	bool *resIsDirty = malloc(bufferSize * sizeof(bool));
-	
-	// Use for loop to read all dirty and assign it to res.
-	for(int curIndex = 0; curIndex < bufferSize; curIndex++) {
-		resIsDirty[curIndex] = !!(frames[curIndex].dirtyFlag == 1);
-	}
-	// Return the dirty results.
-	return resIsDirty;
-}
 
 extern int *getFixCounts (BM_BufferPool *const bm) {
 	// Read frames first from mgmtData.
@@ -416,24 +405,16 @@ extern int *getFixCounts (BM_BufferPool *const bm) {
 	return res;
 }
 
-//Retrieve the number of read I/O operations for a given buffer manager.
-extern int getNumReadIO(BM_BufferPool *const bufferManager) {
-    // Check if bufferManager is NULL
-    if (bufferManager == NULL) {
-        return -1; // Return an error code or handle this case as needed
-    }
-
-    // Return the read I/O count from the bufferManager
-    return bufferManager->readIOCount;
-}
-
-// Retrieve the number of write I/O operations for a given buffer manager.
-extern int getNumWriteIO(BM_BufferPool *const bufferManager) {
-    // Check if bufferManager is NULL
-    if (bufferManager == NULL) {
-        return -1; // Return an error code or handle this case as needed
-    }
-
-    // Return the write I/O count from the bufferManager
-    return bufferManager->writeIOCount;
+extern bool *getDirtyFlags (BM_BufferPool *const bm)
+{
+	PageFrame *buffers = (PageFrame *)bm->mgmtData;
+	// resIsDirty is an array indicates all dirty flags
+	bool *resIsDirty = malloc(bufferSize * sizeof(bool));
+	
+	// Use for loop to read all dirty and assign it to res.
+	for(int curIndex = 0; curIndex < bufferSize; curIndex++) {
+		resIsDirty[curIndex] = !!(frames[curIndex].dirtyFlag == 1);
+	}
+	// Return the dirty results.
+	return resIsDirty;
 }

@@ -176,6 +176,7 @@ extern PageNumber *getFrameContents (BM_BufferPool *const bm)
 extern bool *getDirtyFlags (BM_BufferPool *const bm)
 {
 	PageFrame *frames = (PageFrame *)bm->mgmtData;
+	// resIsDirty is an array indicates all dirty flags
 	bool *resIsDirty = malloc(bufferSize * sizeof(bool));
 	
 	// Use for loop to read all dirty and assign it to res.

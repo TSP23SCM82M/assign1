@@ -4,6 +4,7 @@
 #include "dt.h"
 #include "storage_mgr.h"
 #include<stdlib.h>
+
 typedef struct Page
 {
 	SM_PageHandle pageData;
@@ -21,6 +22,8 @@ typedef struct BM_BufferPool {
 	ReplacementStrategy strategy;
 	void *mgmtData; // use this one to store the bookkeeping info your buffer
 	// manager needs for a buffer pool
+	int readIOCount; // Variable to track read I/O operations
+    int writeIOCount; // New variable to track write I/O operations
 } BM_BufferPool;
 
 typedef struct BM_PageHandle {
@@ -332,4 +335,24 @@ extern int *getFixCounts (BM_BufferPool *const bm) {
 	return res;
 }
 
+//Retrieve the number of read I/O operations for a given buffer manager.
+extern int getNumReadIO(BM_BufferPool *const bufferManager) {
+    // Check if bufferManager is NULL
+    if (bufferManager == NULL) {
+        return -1; // Return an error code or handle this case as needed
+    }
 
+    // Return the read I/O count from the bufferManager
+    return bufferManager->readIOCount;
+}
+
+// Retrieve the number of write I/O operations for a given buffer manager.
+extern int getNumWriteIO(BM_BufferPool *const bufferManager) {
+    // Check if bufferManager is NULL
+    if (bufferManager == NULL) {
+        return -1; // Return an error code or handle this case as needed
+    }
+
+    // Return the write I/O count from the bufferManager
+    return bufferManager->writeIOCount;
+}

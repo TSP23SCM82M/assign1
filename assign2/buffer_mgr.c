@@ -386,8 +386,8 @@ RC pinPage(BM_BufferPool *const bm, BM_PageHandle *const page,
 		frames[emptyFrameIndex].fixCount = tmpPage->fixCount;
 		frames[emptyFrameIndex].lastUsedTimeStamp = tmpPage->lastUsedTimeStamp;
 	}
-	free(tmpPage->pageData);
-	free(tmpPage);
+	// free(tmpPage->pageData);
+	// free(tmpPage);
 	tmpPage = NULL;
 	return RC_OK;
 }

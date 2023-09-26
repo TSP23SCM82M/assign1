@@ -31,7 +31,7 @@ free(real);                                \
 // test and helper methods
 static void createDummyPages(BM_BufferPool *bm, int num);
 
-static void testLRU_K (void);
+static void testLFU (void);
 
 static void testError (void);
 

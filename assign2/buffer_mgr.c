@@ -34,8 +34,8 @@ extern void writeWhenDirty(BM_BufferPool *const bm, PageFrame curPage)
 		SM_FileHandle *sfh = malloc(sizeof(SM_FileHandle));
 		openPageFile(bm->pageFile, sfh);
 		writeBlock(curPage.pageNum, sfh, curPage.pageData);
-		totalWrite++;
 		closePageFile(sfh);
+		totalWrite++;
 		// free(sfh);
 		// sfh = NULL;
 	}
@@ -294,10 +294,9 @@ RC forcePage(BM_BufferPool *const bm, BM_PageHandle *const page)
 void readFromSMBlock(BM_BufferPool *const bm, PageFrame *curPage, BM_PageHandle *const page, PageNumber pageNum)
 {
 	SM_FileHandle fileHandler;
-	openPageFile(bm->pageFile, &fileHandler);
 	curPage->pageData = (SM_PageHandle)malloc(PAGE_SIZE);
-	ensureCapacity(pageNum, &fileHandler);
 	openPageFile(bm->pageFile, &fileHandler);
+	ensureCapacity(pageNum, &fileHandler);
 	readBlock(pageNum, &fileHandler, curPage->pageData);
 	closePageFile(&fileHandler);
 	page->data = curPage->pageData;

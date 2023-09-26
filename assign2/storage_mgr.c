@@ -300,7 +300,7 @@ extern RC appendEmptyBlock (SM_FileHandle *fHandle) {
 
 extern RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle) {
 	// Open the file first and use "a" mode. Because we need append something to the file.
-	textFile = fopen(fHandle->fileName, "a");
+	// textFile = fopen(fHandle->fileName, "a");
 	
 	if (textFile == NULL) {
 		// This means open failed.
@@ -314,7 +314,7 @@ extern RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle) {
 		appendEmptyBlock(fHandle);
 	}
 	// Close the file.
-	fclose(textFile);
+	// fclose(textFile);
 	return RC_OK;
 }
 

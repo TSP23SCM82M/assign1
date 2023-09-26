@@ -28,7 +28,7 @@ int timeStamp = 0;
 
 extern void writeWhenDirty(BM_BufferPool *const bm, PageFrame curPage)
 {
-
+	printf("write when dirty is dirty: %i\n", curPage.dirtyFlag);
 	if (curPage.dirtyFlag == 1)
 	{
 		SM_FileHandle *sph;
@@ -178,6 +178,7 @@ RC shutdownBufferPool(BM_BufferPool *const bm)
 	// Check if there are any pinned pages in the pool
 	for (int i = 0; i < bufferSize; i++)
 	{
+		// printf("%d, fixCount: %d\n", i, bufferPool[i].fixCount);
 		if (bufferPool[i].fixCount > 0)
 		{
 			return RC_PAGE_PINNED_IN_BUFFER_POOL;
@@ -249,11 +250,23 @@ RC markDirty(BM_BufferPool *const bm, BM_PageHandle *const page)
 	}
 }
 
+void printFixCount(BM_BufferPool *const bm) {
+	PageFrame * buffers = bm->mgmtData;
+	printf("BufferFixCounts: ");
+	for (int i = 0; i < bufferSize; ++i) {
+		printf("%d, ", buffers[i].fixCount);
+	}
+	printf("\n");
+}
 RC unpinPage(BM_BufferPool *const bm, BM_PageHandle *const page)
 {
+
+	// printf("unpin ");
+	// printFixCount(bm);
 	PageFrame *buffers = bm->mgmtData;
-	for (int i = 0; i < bm->numPages; i++)
+	for (int i = 0; i < bufferSize; i++)
 	{
+		// printf("pageNum check: %d, %d; ", buffers[i].pageNum, page->pageNum);
 		if (buffers[i].pageNum == page->pageNum)
 		{
 			// Decrease the fix count
@@ -264,6 +277,7 @@ RC unpinPage(BM_BufferPool *const bm, BM_PageHandle *const page)
 			}
 		}
 	}
+	return RC_OK;
 }
 
 RC forcePage(BM_BufferPool *const bm, BM_PageHandle *const page)
@@ -291,14 +305,18 @@ void readFromSMBlock(BM_BufferPool *const bm, PageFrame *curPage, BM_PageHandle 
 	// curPage->pageData = (SM_PageHandle)malloc(PAGE_SIZE);
 	ensureCapacity(pageNum, &fileHandler);
 	readBlock(pageNum, &fileHandler, curPage->pageData);
-	closePageFile(&fileHandle);
+	closePageFile(&fileHandler);
+	page->data = curPage->pageData;
+	page->pageNum = pageNum;
 	totalRead++;
 }
+
 
 RC pinPage(BM_BufferPool *const bm, BM_PageHandle *const page,
 		   const PageNumber pageNum)
 {
 
+	// printFixCount(bm);
 	PageFrame *frames = (PageFrame *)bm->mgmtData;
 	SM_FileHandle fileHandle;
 	RC rc;
@@ -321,6 +339,7 @@ RC pinPage(BM_BufferPool *const bm, BM_PageHandle *const page,
 		}
 	}
 	PageFrame *tmpPage = (PageFrame *)malloc(sizeof(PageFrame));
+	tmpPage->pageData = (SM_PageHandle) malloc(PAGE_SIZE);
 
 	readFromSMBlock(bm, tmpPage, page, pageNum);
 	tmpPage->clockFlag = 1;

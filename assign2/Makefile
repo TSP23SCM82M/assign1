@@ -36,3 +36,10 @@ all:
 	make test2_2
 	make test3
 	make test4
+
+run:
+	./output/test1.o
+	./output/test2.o
+	./output/test2_2.o
+	./output/test3.o
+	./output/test4.o

@@ -1,5 +1,10 @@
 # assign1
 
+## Notable
+
+- We have completed FIFO, LRU, CLOCK, LRU_K, LFU algorithm and relevant test cases have been written.
+- We've passed all test cases included test_assign1_1, test_assign2_1, test_assign2_2, test_assign2_3_LFU, test_assign2_4_CLOCK.
+
 ## How to run this project
 
 First, you can change the variable "RUNNER" and "FLAG" for some build requirements. For example, use another compiler or build for better debugger. When we want to build for debugger, we need add flag for debugger.
@@ -19,7 +24,11 @@ This command is used to build all test files, and the output will generated in t
 You may don't need to run this directly.
 This command is used to remove the "output" directory and all of it's subfiles. It is really useful when you want to make sure your workplace is clean. For example, you want to push your code to remote repository.
 
-4) ./output/test2.o
+4 make run
+
+After build, you can use this to run all the tests.
+
+5) ./output/test2.o
 
 After build, you can use this command to run this project.
 

@@ -107,7 +107,7 @@ extern RC destroyPageFile (char *fileName) {
 
 extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
-	if (pageNum < 0 || pageNum >= fHandle->totalNumPages) {
+	if (pageNum < 0 || pageNum > fHandle->totalNumPages) {
 
         return RC_READ_NON_EXISTING_PAGE;
     }
@@ -118,8 +118,7 @@ extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
 		fseek(textFile,pageNum*PAGE_SIZE, SEEK_SET);
 		
 		bytesRead=fread(memPage,sizeof(char),PAGE_SIZE,textFile);
-		
-		
+
         if (bytesRead != PAGE_SIZE) {
             if (feof(textFile)) {
             // The requested page is not found because the end of the file has been reached.

@@ -35,6 +35,8 @@ extern void writeWhenDirty(BM_BufferPool *const bm, PageFrame curPage)
 		writeBlock(curPage.pageNum, sfh, curPage.pageData);
 		totalWrite++;
 		closePageFile(sfh);
+		free(sfh);
+		sfh = NULL;
 	}
 }
 
@@ -198,7 +200,7 @@ RC shutdownBufferPool(BM_BufferPool *const bm)
 RC forceFlushPool(BM_BufferPool *const bm)
 {
 
-	SM_FileHandle fileHandle;
+	// SM_FileHandle fileHandle;
 	// RC rc;
 	// rc = openPageFile(bm->pageFile, &fileHandle);
 	PageFrame *buffers = bm->mgmtData;
@@ -284,8 +286,9 @@ void readFromSMBlock(BM_BufferPool *const bm, PageFrame *curPage, BM_PageHandle 
 {
 	SM_FileHandle fileHandler;
 	openPageFile(bm->pageFile, &fileHandler);
-	// curPage->pageData = (SM_PageHandle)malloc(PAGE_SIZE);
+	curPage->pageData = (SM_PageHandle)malloc(PAGE_SIZE);
 	ensureCapacity(pageNum, &fileHandler);
+	openPageFile(bm->pageFile, &fileHandler);
 	readBlock(pageNum, &fileHandler, curPage->pageData);
 	closePageFile(&fileHandler);
 	page->data = curPage->pageData;
@@ -300,8 +303,8 @@ RC pinPage(BM_BufferPool *const bm, BM_PageHandle *const page,
 
 	// printFixCount(bm);
 	PageFrame *frames = (PageFrame *)bm->mgmtData;
-	SM_FileHandle fileHandle;
-	RC rc;
+	// SM_FileHandle fileHandle;
+	// RC rc;
 
 	// Check if buffer pool is initialized
 	// if (bm->pageFile == NULL) {
@@ -369,7 +372,9 @@ RC pinPage(BM_BufferPool *const bm, BM_PageHandle *const page,
 		// Found an empty frame, load the page into it
 		frames[emptyFrameIndex] = *tmpPage;
 	}
-
+	free(tmpPage->pageData);
+	free(tmpPage);
+	tmpPage = NULL;
 	return RC_OK;
 }
 

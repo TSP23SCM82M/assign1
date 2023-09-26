@@ -26,7 +26,8 @@ After build, you can use this command to run this project.
 
 **Replacement Strategies**
 
-**For bonus credit : ** *Clock*
+**For bonus credit :** 
+*Clock*
 
 CLOCK determines whether the desired page is already present in the buffer pool.
 

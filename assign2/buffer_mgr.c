@@ -28,14 +28,13 @@ int timeStamp = 0;
 
 extern void writeWhenDirty(BM_BufferPool *const bm, PageFrame curPage)
 {
-	printf("write when dirty is dirty: %i\n", curPage.dirtyFlag);
 	if (curPage.dirtyFlag == 1)
 	{
-		SM_FileHandle *sph;
-		openPageFile(bm->pageFile, &sph);
-		writeBlock(curPage.pageNum, &sph, curPage.pageData);
+		SM_FileHandle *sfh = malloc(sizeof(SM_FileHandle));
+		openPageFile(bm->pageFile, sfh);
+		writeBlock(curPage.pageNum, sfh, curPage.pageData);
 		totalWrite++;
-		closePageFile(sph);
+		closePageFile(sfh);
 	}
 }
 
@@ -200,37 +199,20 @@ RC forceFlushPool(BM_BufferPool *const bm)
 {
 
 	SM_FileHandle fileHandle;
-	RC rc;
-	rc = openPageFile(bm->pageFile, &fileHandle);
+	// RC rc;
+	// rc = openPageFile(bm->pageFile, &fileHandle);
 	PageFrame *buffers = bm->mgmtData;
 
 	// Open the page file
-	if (rc != RC_OK)
-	{
-		return rc;
-	}
+	// if (rc != RC_OK)
+	// {
+	// 	return rc;
+	// }
 	// Iterate through the page frames and write dirty pages back to disk
 	for (int i = 0; i < bm->numPages; i++)
 	{
 		writeWhenDirty(bm, buffers[i]);
-		// if (buffers[i].dirty == 1) {
-		//     // Calculate the byte offset where the data should be written
-		//     long offset = PageFrame[i].pageNum * PAGE_SIZE * sizeof(char);
-
-		//     // Write the page data to the page file using writeBlock
-		// 	rc = writeBlock(PageFrame[i].pageNum, &fileHandle, PageFrame[i].data);
-		//     if (rc  != RC_OK) {
-		//         return rc;
-		//     }
-
-		//     // Update the page frame's dirty flag
-		//     buffers[i].dirty = 0;
-
-		// }
 	}
-
-	// Close the page file
-	// closePageFile(fileHandle);
 
 	return RC_OK;
 }

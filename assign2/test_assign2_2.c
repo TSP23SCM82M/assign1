@@ -37,7 +37,7 @@ static void testError (void);
 
 // main method
 int
-main (void)
+main2 (void)
 {
     initStorageManager();
     testName = "";

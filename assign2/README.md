@@ -26,6 +26,21 @@ After build, you can use this command to run this project.
 
 **Replacement Strategies**
 
+**For bonus credit : ** *Clock*
+
+CLOCK determines whether the desired page is already present in the buffer pool.
+
+If it's there, it lets us know about it and raises the pin count, which shows that it's in use.
+
+If not, it searches for a free space in the pool to use.
+If it locates an empty space, it fills it with the desired page from the disk.
+
+CLOCK uses a reference bit to keep track of whether or not each page in the pool has recently been accessed.
+
+It clears the reference bit and searches for the next page if it needs to replace a page and discovers one that has a reference bit set, indicating that it has recently been used.
+
+Until it finds a page that doesn't have the reference bit set, indicating that it hasn't been used recently, it continues doing this and replaces that page with the new one.
+
 *First-In-First-Out (FIFO)*
 
 Like a queue, FIFO operates. It determines whether the desired page is already present in the buffer pool, which is temporary memory for pages.
@@ -46,20 +61,6 @@ Imagine that the buffer pool's pages are organized from most recently used at on
 
 Prior to inserting the new page, LRU selects the page that had the least recently utilized end and writes it to the disk.
 
-*Clock*
-
-CLOCK determines whether the desired page is already present in the buffer pool.
-
-If it's there, it lets us know about it and raises the pin count, which shows that it's in use.
-
-If not, it searches for a free space in the pool to use.
-If it locates an empty space, it fills it with the desired page from the disk.
-
-Importantly, CLOCK uses a reference bit to keep track of whether or not each page in the pool has recently been accessed.
-
-It clears the reference bit and searches for the next page if it needs to replace a page and discovers one that has a reference bit set, indicating that it has recently been used.
-
-Until it finds a page that doesn't have the reference bit set, indicating that it hasn't been used recently, it continues doing this and replaces that page with the new one.
 
 *initBufferPool*
 

@@ -1,7 +1,9 @@
 {
   "files.associations": {
     "array": "c",
-    "vector": "c"
+    "vector": "c",
+    "__hash_table": "c",
+    "filesystem": "c"
   },
   "C_Cpp_Runner.cCompilerPath": "clang",
   "C_Cpp_Runner.cppCompilerPath": "clang++",

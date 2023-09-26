@@ -245,7 +245,7 @@ extern RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
 extern RC writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
 	// If pageNum is negative or pageNum exceeds the total number of pages, return an error
-   if (pageNum < 0 || fHandle->totalNumPages < (pageNum + 1)) {
+   if (pageNum < 0 || fHandle->totalNumPages < pageNum) {
 		return RC_READ_NON_EXISTING_PAGE;
 	}
 	

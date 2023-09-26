@@ -3,7 +3,8 @@
     "array": "c",
     "vector": "c",
     "__hash_table": "c",
-    "filesystem": "c"
+    "filesystem": "c",
+    "complex": "c"
   },
   "C_Cpp_Runner.cCompilerPath": "clang",
   "C_Cpp_Runner.cppCompilerPath": "clang++",

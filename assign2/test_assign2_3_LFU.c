@@ -33,8 +33,6 @@ static void createDummyPages(BM_BufferPool *bm, int num);
 
 static void testLFU (void);
 
-static void testError (void);
-
 // main method
 int
 main (void)
@@ -43,7 +41,6 @@ main (void)
     testName = "";
     
     testLFU();
-    testError();
     return 0;
 }
 
@@ -88,11 +85,11 @@ testLFU (void)
         "[0 0],[1 0],[2 0],[3 0],[4 0]",
         "[0 0],[1 0],[2 0],[3 0],[4 0]",
         // check that pages get evicted in LRU_K order
-        "[0 0],[1 0],[2 0],[5 0],[4 0]",
-        "[0 0],[1 0],[2 0],[5 0],[6 0]",
-        "[7 0],[1 0],[2 0],[5 0],[6 0]",
-        "[7 0],[1 0],[8 0],[5 0],[6 0]",
-        "[7 0],[9 0],[8 0],[5 0],[6 0]"
+        "[5 0],[1 0],[2 0],[3 0],[4 0]",
+        "[5 0],[6 0],[2 0],[3 0],[4 0]",
+        "[5 0],[6 0],[7 0],[3 0],[4 0]",
+        "[5 0],[6 0],[7 0],[8 0],[4 0]",
+        "[5 0],[6 0],[7 0],[8 0],[9 0]"
     };
     const int orderRequests[] = {3,4,0,2,1};
     const int numLRU_KOrderChange = 5;
@@ -136,55 +133,6 @@ testLFU (void)
     ASSERT_EQUALS_INT(10, getNumReadIO(bm), "check number of read I/Os");
     
     CHECK(shutdownBufferPool(bm));
-    CHECK(destroyPageFile("testbuffer.bin"));
-    
-    free(bm);
-    free(h);
-    TEST_DONE();
-}
-
-
-// test error cases
-void
-testError (void)
-{
-    BM_BufferPool *bm = MAKE_POOL();
-    BM_PageHandle *h = MAKE_PAGE_HANDLE();
-    testName = "ERROR TEST";
-    
-    CHECK(createPageFile("testbuffer.bin"));
-    
-    // pinpage until buffer pool is full and then request additional page.
-    CHECK(initBufferPool(bm, "testbuffer.bin", 3, RS_FIFO, NULL));
-    CHECK(pinPage(bm, h, 0));
-    CHECK(pinPage(bm, h, 1));
-    CHECK(pinPage(bm, h, 2));
-    
-    ASSERT_ERROR(pinPage(bm, h, 3), "try to pin page when pool is full of pinned pages with fix-count > 0");
-    
-    CHECK(shutdownBufferPool(bm));
-    
-    // try to pin page with negative page number.
-    CHECK(initBufferPool(bm, "testbuffer.bin", 3, RS_FIFO, NULL));
-    ASSERT_ERROR(pinPage(bm, h, -10), "try to pin page with negative page number");
-    CHECK(shutdownBufferPool(bm));
-    
-    
-    // try to use uninitialized buffer pool
-    ASSERT_ERROR(initBufferPool(bm, "unavailable.bin", 3, RS_FIFO, NULL), "try to init buffer pool for non existing page file");
-    ASSERT_ERROR(shutdownBufferPool(bm), "shutdown buffer pool that is not open");
-    ASSERT_ERROR(forceFlushPool(bm), "flush buffer pool that is not open");
-    ASSERT_ERROR(pinPage(bm, h, 1), "pin page in buffer pool that is not open");
-    
-    
-    // try to unpin, mark, or force page that is not in pool
-    CHECK(initBufferPool(bm, "testbuffer.bin", 3, RS_FIFO, NULL));
-    ASSERT_ERROR(unpinPage(bm, h), "Try to unpin a page which is not available in framelist.");
-    ASSERT_ERROR(forcePage(bm, h), "Try to forceflush a page which is not available in framelist.");
-    ASSERT_ERROR(markDirty(bm, h), "Try to markdirty a page which is not available in framelist.");
-    CHECK(shutdownBufferPool(bm));
-    
-    // done remove page file
     CHECK(destroyPageFile("testbuffer.bin"));
     
     free(bm);

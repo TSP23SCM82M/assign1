@@ -143,6 +143,7 @@ extern void CLOCK(BM_BufferPool *const bm, PageFrame page)
 		if (buffers[pointer].clockFlag != 0)
 		{
 			buffers[pointer].clockFlag--;
+			pointer++;
 			continue;
 		}
 		writeWhenDirty(bm, buffers[pointer]);
@@ -329,6 +330,7 @@ RC pinPage(BM_BufferPool *const bm, BM_PageHandle *const page,
 			page->pageNum = pageNum;
 			page->data = frames[i].pageData;
 			frames[i].lastUsedTimeStamp = ++timeStamp;
+			frames[i].clockFlag = 1;
 			return RC_OK;
 		}
 	}

@@ -33,8 +33,6 @@ static void createDummyPages(BM_BufferPool *bm, int num);
 
 static void testCLOCK (void);
 
-static void testError (void);
-
 // main method
 int
 main (void)
@@ -68,7 +66,7 @@ createDummyPages(BM_BufferPool *bm, int num)
     free(h);
 }
 
-// test the LRU_K page replacement strategy
+// test the CLOCK page replacement strategy
 void
 testCLOCK (void)
 {
@@ -80,27 +78,27 @@ testCLOCK (void)
         "[0 0],[1 0],[2 0],[-1 0],[-1 0]",
         "[0 0],[1 0],[2 0],[3 0],[-1 0]",
         "[0 0],[1 0],[2 0],[3 0],[4 0]",
-        // use some of the page to create a fixed LRU_K order without changing pool content
+        // use some of the page to create a fixed CLOCK order without changing pool content
         "[0 0],[1 0],[2 0],[3 0],[4 0]",
         "[0 0],[1 0],[2 0],[3 0],[4 0]",
         "[0 0],[1 0],[2 0],[3 0],[4 0]",
         "[0 0],[1 0],[2 0],[3 0],[4 0]",
         "[0 0],[1 0],[2 0],[3 0],[4 0]",
-        // check that pages get evicted in LRU_K order
-        "[0 0],[1 0],[2 0],[5 0],[4 0]",
-        "[0 0],[1 0],[2 0],[5 0],[6 0]",
-        "[7 0],[1 0],[2 0],[5 0],[6 0]",
-        "[7 0],[1 0],[8 0],[5 0],[6 0]",
-        "[7 0],[9 0],[8 0],[5 0],[6 0]"
+        // check that pages get evicted in CLOCK order
+        "[0 0],[5 0],[2 0],[3 0],[4 0]",
+        "[0 0],[5 0],[6 0],[3 0],[4 0]",
+        "[0 0],[5 0],[6 0],[7 0],[4 0]",
+        "[0 0],[5 0],[6 0],[7 0],[8 0]",
+        "[9 0],[5 0],[6 0],[7 0],[8 0]",
     };
     const int orderRequests[] = {3,4,0,2,1};
-    const int numLRU_KOrderChange = 5;
+    const int numCLOCKOrderChange = 5;
     
     int i;
     int snapshot = 0;
     BM_BufferPool *bm = MAKE_POOL();
     BM_PageHandle *h = MAKE_PAGE_HANDLE();
-    testName = "Testing LRU_K page replacement";
+    testName = "Testing CLOCK page replacement";
     
     CHECK(createPageFile("testbuffer.bin"));
     createDummyPages(bm, 100);
@@ -114,15 +112,15 @@ testCLOCK (void)
         ASSERT_EQUALS_POOL(poolContents[snapshot++], bm, "check pool content reading in pages");
     }
     
-    // read pages to change LRU_K order
-    for(i = 0; i < numLRU_KOrderChange; i++)
+    // read pages to change CLOCK order
+    for(i = 0; i < numCLOCKOrderChange; i++)
     {
         pinPage(bm, h, orderRequests[i]);
         unpinPage(bm, h);
         ASSERT_EQUALS_POOL(poolContents[snapshot++], bm, "check pool content using pages");
     }
     
-    // replace pages and check that it happens in LRU_K order
+    // replace pages and check that it happens in CLOCK order
     for(i = 0; i < 5; i++)
     {
         pinPage(bm, h, 5 + i);

@@ -6,22 +6,29 @@ First, you can change the variable "RUNNER" and "FLAG" for some build requiremen
 
 The build method are based Makefile. There are the commands that you can use.
 
-1) make clean
+1) make
 
+This is run the default command, which is "all".
+
+2) make all
+
+This command is used to build all test files, and the output will generated in the "output" file.
+
+3) make clean
+
+You may don't need to run this directly.
 This command is used to remove the "output" directory and all of it's subfiles. It is really useful when you want to make sure your workplace is clean. For example, you want to push your code to remote repository.
 
-2) make test1
-
-This command is used to build the test1 file, and the output will generated in the "output" file.
-
-
-3) make
-
-This is run the default command, which is "test1".
-
-4) ./output/test1.o
+4) ./output/test2.o
 
 After build, you can use this command to run this project.
+
+./output/test1.o for assign1 test cases.
+./output/test2.o for assign2 test cases.
+./output/test2_2.o for assign2_2 test cases.
+./output/test3.o for assign2 LFU test cases.
+./output/test4.o for assign2 CLOCK test cases.
+
 
 
 **Replacement Strategies**

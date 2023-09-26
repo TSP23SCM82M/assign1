@@ -4,6 +4,7 @@
 #include "dt.h"
 #include "storage_mgr.h"
 #include <stdlib.h>
+#include <stdint.h>
 
 typedef struct Page
 {
@@ -35,8 +36,8 @@ extern void writeWhenDirty(BM_BufferPool *const bm, PageFrame curPage)
 		writeBlock(curPage.pageNum, sfh, curPage.pageData);
 		totalWrite++;
 		closePageFile(sfh);
-		free(sfh);
-		sfh = NULL;
+		// free(sfh);
+		// sfh = NULL;
 	}
 }
 

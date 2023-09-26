@@ -222,6 +222,7 @@ RC forceFlushPool(BM_BufferPool *const bm)
 	for (int i = 0; i < bm->numPages; i++)
 	{
 		writeWhenDirty(bm, buffers[i]);
+		buffers[i].dirtyFlag = 0;
 	}
 
 	return RC_OK;

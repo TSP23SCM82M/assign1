@@ -115,8 +115,15 @@ extern void LRU(BM_BufferPool *const bm, PageFrame page)
 		loopNum++;
 	}
 	writeWhenDirty(bm, buffers[replaceIndex]);
-	buffers[replaceIndex] = page;
-	buffers[replaceIndex].lastUsedTimeStamp = ++timeStamp;
+	buffers[replaceIndex].pageData = page.pageData;
+	buffers[replaceIndex].pageData = page.pageData;
+	buffers[replaceIndex].pageNum = page.pageNum;
+	buffers[replaceIndex].dirtyFlag = page.dirtyFlag;
+	buffers[replaceIndex].fixCount = page.fixCount;
+	buffers[replaceIndex].lastUsedTimeStamp = page.lastUsedTimeStamp;
+
+
+	// buffers[replaceIndex].lastUsedTimeStamp = ++timeStamp;
 }
 extern void CLOCK(BM_BufferPool *const bm, PageFrame page)
 {
@@ -320,6 +327,7 @@ RC pinPage(BM_BufferPool *const bm, BM_PageHandle *const page,
 			frames[i].fixCount++;
 			page->pageNum = pageNum;
 			page->data = frames[i].pageData;
+			frames[i].lastUsedTimeStamp = ++timeStamp;
 			return RC_OK;
 		}
 	}
@@ -370,7 +378,12 @@ RC pinPage(BM_BufferPool *const bm, BM_PageHandle *const page,
 	else
 	{
 		// Found an empty frame, load the page into it
-		frames[emptyFrameIndex] = *tmpPage;
+		// frames[emptyFrameIndex] = *tmpPage;
+		frames[emptyFrameIndex].pageData = tmpPage->pageData;
+		frames[emptyFrameIndex].pageNum = tmpPage->pageNum;
+		frames[emptyFrameIndex].dirtyFlag = tmpPage->dirtyFlag;
+		frames[emptyFrameIndex].fixCount = tmpPage->fixCount;
+		frames[emptyFrameIndex].lastUsedTimeStamp = tmpPage->lastUsedTimeStamp;
 	}
 	free(tmpPage->pageData);
 	free(tmpPage);

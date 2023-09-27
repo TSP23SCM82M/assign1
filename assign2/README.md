@@ -174,8 +174,8 @@ It gives how many pages have been written to the page file (saved to the disk) 
 
 
 **Team Members**
-Anwesha Nayak(A20512145): 25%
-Taufeeq Ahmed Mohammed(A20512082): 25%
-Shruti Shankar Shete(A20518508): 25%
-Jianqi Jin(A20523325): 25%
-
+Anwesha Nayak(A20512145): 20%
+Taufeeq Ahmed Mohammed(A20512082): 20%
+Shruti Shankar Shete(A20518508): 20%
+Jianqi Jin(A20523325): 20%
+Syed Zoraiz Sibtain (A20521018): 20%

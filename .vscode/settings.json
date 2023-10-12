@@ -5,7 +5,8 @@
     "__hash_table": "c",
     "filesystem": "c",
     "complex": "c",
-    "dberror.h": "c"
+    "dberror.h": "c",
+    "__locale": "c"
   },
   "C_Cpp_Runner.cCompilerPath": "clang",
   "C_Cpp_Runner.cppCompilerPath": "clang++",

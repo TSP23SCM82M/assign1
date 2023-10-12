@@ -275,7 +275,6 @@ RC shutdownBufferPool(BM_BufferPool *const bm)
 	// Check if there are any pinned pages in the pool
 	for (int i = 0; i < bufferSize; i++)
 	{
-		// printf("%d, fixCount: %d\n", i, bufferPool[i].fixCount);
 		if (bufferPool[i].fixCount > 0)
 		{
 			// return RC_PAGE_PINNED_IN_BUFFER_POOL;

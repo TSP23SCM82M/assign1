@@ -5,6 +5,10 @@
 
 /* module wide constants */
 #define PAGE_SIZE 4096
+// This is the maximum numbers of pages
+#define MAX_PAGES 128
+// This is the size of attribute
+#define ATTR_SIZE 32
 
 /* return code definitions */
 typedef int RC;
@@ -30,6 +34,11 @@ typedef int RC;
 #define RC_ERROR 999
 /* holder for error messages */
 extern char *RC_message;
+
+
+// Added new definitions for Record Manager
+#define RC_RM_NO_TUPLE_WITH_GIVEN_RID 600
+#define RC_SCAN_CONDITION_NOT_FOUND 601
 
 /* print a message to standard out describing the error */
 extern void printError (RC error);

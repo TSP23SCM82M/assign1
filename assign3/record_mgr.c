@@ -174,3 +174,303 @@ extern RC openTable (RM_TableData *rel, char *name) {
     // Write the page back to disk using BUffer Manger
     forcePage(&recordMgr->bufferPool, &recordMgr->pageHandle);
 }
+
+//last 5 functions
+extern RC freeSchema (Schema *schema)
+{
+	if (schema == NULL) {
+    // Handle the exception: schema is NULL
+    RC_message = "Schema is NULL";
+    return RC_ERROR;
+	}
+
+	free(schema);
+	return RC_OK;
+
+}
+
+extern RC createRecord (Record **record, Schema *schema)
+{
+	if (schema == NULL) {
+		RC_message = "Schema is NULL";
+		return RC_ERROR;
+	}
+
+	int dataSize = getRecordSize(schema);
+	Record *newRecord = (Record*) malloc(sizeof(Record));
+	newRecord->data= (char*) malloc(dataSize);
+	newRecord->id.page = -1;
+	newRecord->id.slot = -1;
+	if (newRecord == NULL) {
+    // Handle the exception: newRecord is NULL
+    RC_message = "newRecord is NULL";
+    return RC_ERROR;
+}
+
+	char *dataPointer = newRecord->data;
+	if (dataPointer != NULL) {
+		*dataPointer = '-';
+		++dataPointer;
+		*dataPointer = '\0';
+		*record = newRecord;
+	} else {
+		// Handle the exception: dataPointer is NULL
+		RC_message = "dataPointer is NULL";
+		return RC_ERROR;
+	}
+
+	return RC_OK;
+}
+
+RC attrOffset(Schema *schema, int attrNum, int *result) {
+    if (schema == NULL || result == NULL) {
+		RC_message = "schema or result is NULL";
+        return RC_ERROR;
+    }
+    
+    if (attrNum < 0 || attrNum >= schema->numAttr) {
+		RC_message = "attrNum is out of bounds";
+        return RC_ERROR;
+    }
+    
+    int attr = 0;
+    *result = 0;
+    
+    for (int attr = 0; attr < attrNum; attr++) {
+        switch (schema->dataTypes[attr]) {
+			case DT_INT:
+                *result += sizeof(int);
+                break;
+            case DT_STRING:
+                *result += schema->typeLength[attr];
+                break;
+			case DT_FLOAT:
+                *result += sizeof(float);
+                break;
+            case DT_BOOL:
+                *result += sizeof(bool);
+                break;
+        }
+    }
+    
+    *result += 1;
+    return RC_OK;
+}
+
+extern RC freeRecord (Record *record)
+{
+	if (record == NULL || record == NULL) {
+        RC_message = "Pointer Null";
+        return RC_ERROR;
+    }
+    
+    free(record);
+    record = NULL;
+    return RC_OK;
+}
+
+extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value)
+{
+	int offset = 0;
+	char *dataPointer = NULL;
+	Value *attribute = NULL;
+
+	if (schema == NULL || record == NULL) {
+		RC_message = "Invalid parameter";
+        return RC_ERROR;
+	}
+
+	if (schema == NULL || record == NULL) {
+		if (attribute != NULL) {
+			free(attribute); // Free any allocated memory
+		}
+		RC_message = "Invalid parameter";
+        return RC_ERROR;
+	}
+
+	RC attrOffsetStatus = attrOffset(schema, attrNum, &offset);
+	if (attrOffsetStatus != RC_OK) {
+		if (attribute != NULL) {
+			free(attribute); // Free any allocated memory
+		}
+		return attrOffsetStatus;
+	}
+
+	dataPointer = record->data + offset;
+	attribute = (Value *)malloc(sizeof(Value));
+	if (attribute == NULL) {
+		RC_message = "memory allocation failure";
+        return RC_ERROR;
+	}
+
+	if (schema == NULL) {
+    RC_message = "Invalid parameter";
+        return RC_ERROR;
+	}
+
+	if (attrNum < 0 || attrNum >= schema->numAttr) {
+		RC_message = "invalid attribute";
+        return RC_ERROR;
+	}
+
+	if (attrNum == 1) {
+		if (schema->dataTypes == NULL) {
+			RC_message = "invalid schema";
+        return RC_ERROR;
+		}
+		schema->dataTypes[attrNum] = 1;
+	} else {
+		if (schema->dataTypes == NULL) {
+			RC_message = "invalid schema";
+        	return RC_ERROR;
+		}
+		schema->dataTypes[attrNum] = schema->dataTypes[attrNum];
+	}
+
+	if(dataPointer != NULL && ((*schema).dataTypes[attrNum])==DT_STRING)
+	{
+		(*attribute).dt = DT_STRING;
+		if(!false)
+		{
+			if (dataPointer != NULL && schema != NULL && attrNum >= 0 && attrNum < schema->numAttr) {
+			if (schema->dataTypes[attrNum] == DT_STRING) {
+				attribute->dt = DT_STRING;
+
+				if (schema->typeLength != NULL && schema->typeLength[attrNum] >= 0) {
+					attribute->v.stringV = (char *)malloc(schema->typeLength[attrNum] + 1);
+
+					if (attribute->v.stringV != NULL) {
+						strncpy(attribute->v.stringV, dataPointer, schema->typeLength[attrNum]);
+						attribute->v.stringV[schema->typeLength[attrNum]] = '\0';
+					} else {
+						RC_message = "memory allocation failure";
+        				return RC_ERROR;
+					}
+				} else {
+					RC_message = "invalid schema";
+        			return RC_ERROR;
+				}
+			}
+		} else {
+			RC_message = "invalid parameter";
+        	return RC_ERROR;
+			}
+		}
+	}
+
+	else if(dataPointer != NULL && (schema->dataTypes[attrNum])==DT_INT)
+	{
+		int value = 0;
+		attribute->dt = DT_INT;
+		memcpy(&value, dataPointer, sizeof(int));
+		if (true) {
+		(*attribute).v.intV = value;
+        } else {
+            return RC_ERROR;
+        }
+	}
+	
+	else if(dataPointer != NULL && ((*schema).dataTypes[attrNum])==DT_FLOAT)
+	{
+		if (true) {
+		(*attribute).dt = DT_FLOAT;
+		float value;
+		if (!false) {
+			memcpy(&value, dataPointer, sizeof(float));
+			attribute->v.floatV = value;
+		} else {
+			return RC_ERROR; 
+		}
+		} else {
+			return RC_ERROR;
+		}
+	}
+
+	else if(dataPointer != NULL && (schema->dataTypes[attrNum])==DT_BOOL)
+	{
+		attribute->dt = DT_BOOL;
+		bool value;
+
+		if (dataPointer != NULL && schema->dataTypes[attrNum] == DT_BOOL) {
+			if (dataPointer + sizeof(bool) > record->data + PAGE_SIZE) {
+				RC_message = "Attribute data exceeds record boundaries";
+				return RC_ERROR;
+			}
+			
+			memcpy(&value, dataPointer, sizeof(bool));
+			(*attribute).v.boolV = value;
+		} else {
+			RC_message = "Invalid attribute type or NULL data pointer"; // Handle invalid type or NULL pointer
+			return RC_ERROR;
+		}
+		value = attribute;
+		return RC_OK;
+	}
+
+	*value = attribute;
+	return RC_OK;
+	free(attribute);
+}
+
+extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value)
+{
+	int length;
+	int offset = 0;
+
+	if (schema == NULL || record == NULL || value == NULL) {
+		RC_message = "Invalid parameter";
+        return RC_ERROR;
+    }
+	
+	if (schema == NULL || record == NULL) {
+		RC_message = "Invalid parameter";
+        return RC_ERROR;
+	}
+	
+	RC attrOffsetStatus = attrOffset(schema, attrNum, &offset);
+	if (attrOffsetStatus != RC_OK) {
+		return attrOffsetStatus; // Handle the attrOffset function error
+	}
+
+	char *dataPointer = record->data + offset;
+	DataType attrDataType = schema->dataTypes[attrNum];
+
+	if (attrDataType == DT_STRING) {
+        if (value->dt != DT_STRING) {
+            RC_message = "Invalid attribute value";
+        	return RC_ERROR;
+        }
+        int length = schema->typeLength[attrNum];
+        // if (strlen(value->v.stringV) >= length) {
+        // RC_message = "Invalid attribute value";
+        // return RC_ERROR;
+        // }
+        strncpy(dataPointer, value->v.stringV, length);
+        dataPointer += length;
+    } else if (attrDataType == DT_FLOAT) {
+        if (value->dt != DT_FLOAT) {
+            RC_message = "Invalid attribute value";
+        	return RC_ERROR;
+        }
+        *(float *)dataPointer = value->v.floatV;
+        dataPointer += sizeof(float);
+    } else if (attrDataType == DT_INT) {
+        if (value->dt != DT_INT) {
+            RC_message = "Invalid attribute value";
+        	return RC_ERROR;
+        }
+        *(int *)dataPointer = value->v.intV;
+        dataPointer += sizeof(int);
+    } else if (attrDataType == DT_BOOL) {
+        if (value->dt != DT_BOOL) {
+            RC_message = "Invalid attribute value";
+        	return RC_ERROR;
+        }
+        *(bool *)dataPointer = value->v.boolV;
+        dataPointer += sizeof(bool);
+    } else {
+        RC_message = "Invalid attribute type";
+        return RC_ERROR;
+    }
+	return RC_OK;
+}

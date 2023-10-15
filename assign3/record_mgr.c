@@ -284,7 +284,32 @@ extern RC closeScan (RM_ScanHandle *scan)
 // dealing with schemas
 extern int getRecordSize (Schema *schema)
 {
+    int recordSize = 0;
 
+    if (schema == NULL || schema->numAttr <= 0) {
+        return 0; 
+    }
+
+    // Calculate the size of the record based on attribute types and lengths
+    for (int i = 0; i < schema->numAttr; i++) {
+        int attrLength = 0;
+
+        // Determine the length of the attribute based on its data type
+        if (schema->dataTypes[i] == DT_INT) {
+            attrLength = sizeof(int);
+        } else if (schema->dataTypes[i] == DT_STRING) {
+            attrLength = schema->typeLength[i];
+        } else if (schema->dataTypes[i] == DT_FLOAT) {
+            attrLength = sizeof(float);
+        } else if (schema->dataTypes[i] == DT_BOOL) {
+            attrLength = sizeof(bool);
+        }
+
+        // Add the attribute length to the total record size
+        recordSize += attrLength;
+    }
+
+    return recordSize;
 
 }
 

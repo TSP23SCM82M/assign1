@@ -182,7 +182,6 @@ extern RC openTable (RM_TableData *rel, char *name) {
     forcePage(&recordMgr->bufferPool, &recordMgr->pageHandle);
 }
 
-
 extern RC deleteRecord (RM_TableData *rel, RID id) {
     if (rel == NULL || rel->mgmtData == NULL) {
         return RC_FILE_NOT_FOUND;
@@ -741,4 +740,111 @@ extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value)
         return RC_ERROR;
     }
 	return RC_OK;
+}
+extern RC closeTable(RM_TableData* rel)
+{
+    // Store the table's metadata before closing it
+    record_Info* rm = rel->mgmtData;
+
+    // Shutdown the Buffer Pool
+    shutdownBufferPool(&rm->bmBufferManager);
+    
+    // Free the schema
+    freeSchema(rel->schema);
+    
+    return RC_OK;
+}
+
+extern RC deleteTable(char* name)
+{
+    RC result = destroyPageFile(name); // Attempt to delete the page file
+
+    if (result == RC_OK)
+    {
+        return RC_OK; // File was successfully deleted
+    }
+    else (result == RC_FILE_NOT_FOUND)
+    {
+        return RC_FILE_NOT_FOUND; // File not found, no need to delete
+    }
+}
+
+extern int getNumTuples(RM_TableData* rel)
+{
+	record_Info* rm = rel->mgmtData;
+	return rm->tuple_count;
+	
+}
+
+extern RC insertRecord(RM_TableData *rel, Record *record)
+{
+    record_Info *mgr = rel->mgmtData;
+    RC returnCode = RC_OK;
+    RID *recordId = &record->id;
+
+    // Try to find an available slot on an existing page
+    for (recordId->page = 1; recordId->page <= mgr->numPages; recordId->page++) {
+        // Pin the page
+        pinPage(&mgr->bmBufferManager, &mgr->pageHandle, recordId->page);
+
+        // Find an empty slot on the page
+        recordId->slot = Page_empty_slot(getRecordSize(rel->schema), mgr->pageHandle.data);
+
+        if (recordId->slot >= 0) {
+            // Mark the page as dirty, as we are modifying it
+            markDirty(&mgr->bmBufferManager, &mgr->pageHandle);
+
+            // Calculate the pointer to the slot where the record will be inserted
+            char *slotPointer = mgr->pageHandle.data + recordId->slot * getRecordSize(rel->schema);
+
+            // Set a marker ('$') to indicate that the slot is now in use
+            *slotPointer = '$';
+
+            // Copy the record data (excluding the marker) to the slot
+            memcpy(slotPointer + 1, record->data, getRecordSize(rel->schema) - 1);
+
+            // Unpin the page
+            unpinPage(&mgr->bmBufferManager, &mgr->pageHandle);
+
+            // Update the tuple count in the table's metadata
+            mgr->tuple_count += 1;
+
+            return returnCode;
+        }
+
+        // Unpin the page if no empty slot was found
+        unpinPage(&mgr->bmBufferManager, &mgr->pageHandle);
+    }
+
+    // If no empty slot was found on any existing page, append a new page
+    recordId->page = mgr->numPages + 1;
+
+    // Allocate a new page
+    ensureCapacity(recordId->page, &mgr->bmBufferManager);
+
+    // Pin the new page
+    pinPage(&mgr->bmBufferManager, &mgr->pageHandle, recordId->page);
+
+    // Find the first slot on the new page
+    recordId->slot = Page_empty_slot(getRecordSize(rel->schema), mgr->pageHandle.data);
+
+    // Mark the page as dirty, as we are modifying it
+    markDirty(&mgr->bmBufferManager, &mgr->pageHandle);
+
+    // Calculate the pointer to the slot where the record will be inserted
+    char *slotPointer = mgr->pageHandle.data + recordId->slot * getRecordSize(rel->schema);
+
+    // Set a marker ('$') to indicate that the slot is now in use
+    *slotPointer = '$';
+
+    // Copy the record data (excluding the marker) to the slot
+    memcpy(slotPointer + 1, record->data, getRecordSize(rel->schema) - 1);
+
+    // Unpin the new page
+    unpinPage(&mgr->bmBufferManager, &mgr->pageHandle);
+
+    // Update the tuple count in the table's metadata
+    mgr->tuple_count += 1;
+
+    return returnCode;
 }

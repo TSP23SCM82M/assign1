@@ -290,7 +290,57 @@ extern int getRecordSize (Schema *schema)
 
 extern Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *typeLength, int keySize, int *keys)
 {
+    // Check for valid inputs
+    if (numAttr <= 0 || attrNames == NULL || dataTypes == NULL || typeLength == NULL) 
+    {
+        return NULL; 
+    }
 
+    Schema *sc = (Schema *)malloc(sizeof(Schema));
+
+    if (sc == NULL) 
+    {
+        return NULL;
+    }
+
+    // Initialize the Schema struct members
+    sc->numAttr = numAttr;
+    sc->attrNames = attrNames;
+    sc->dataTypes = dataTypes;
+    sc->typeLength = typeLength;
+    sc->keySize = keySize;
+    sc->keyAttrs = keys;
+    // schema->numAttr = numAttr;
+    // schema->attrNames = (char **)malloc(sizeof(char *) * numAttr);
+    // schema->dataTypes = (DataType *)malloc(sizeof(DataType) * numAttr);
+    // schema->typeLength = (int *)malloc(sizeof(int) * numAttr);
+    // schema->keySize = keySize;
+    // schema->keyAttrs = (int *)malloc(sizeof(int) * keySize);
+
+    // if (schema->attrNames == NULL || schema->dataTypes == NULL || schema->typeLength == NULL || schema->keyAttrs == NULL) {
+    //     free(schema->attrNames);
+    //     free(schema->dataTypes);
+    //     free(schema->typeLength);
+    //     free(schema->keyAttrs);
+    //     free(schema);
+    //     return NULL;
+    // }
+
+    // // Copy attribute names, data types, and type lengths
+    // for (int i = 0; i < numAttr; i++) {
+    //     schema->attrNames[i] = strdup(attrNames[i]);
+    //     schema->dataTypes[i] = dataTypes[i];
+    //     schema->typeLength[i] = typeLength[i];
+    // }
+
+    // // Copy key attributes
+    // if (keySize > 0 && keys != NULL) {
+    //     for (int i = 0; i < keySize; i++) {
+    //         schema->keyAttrs[i] = keys[i];
+    //     }
+    // }
+
+    return sc;
 
 }
 

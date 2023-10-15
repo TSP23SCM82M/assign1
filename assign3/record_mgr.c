@@ -331,6 +331,40 @@ if (rel == NULL || scan == NULL || cond == NULL) {
 extern RC next (RM_ScanHandle *scan, Record *record)
 {
 
+  if (scan == NULL || record == NULL) {
+        return RC_FILE_NOT_FOUND;
+    }
+
+    RM_ScanData *scanData = (RM_ScanData *)scan->mgmtData;
+    RecordMgr *rm = scanData->recordManager;
+    RM_TableData *rel = scan->rel;
+
+    // Loop through pages and slots to find the next matching record
+    while (scanData->currentRecordPage < rm->freePage) {
+        // Move to the next page or slot
+        if (scanData->currentRecordSlot + 1 >= rel->schema->numAttr) {
+            scanData->currentRecordSlot = 0;
+            scanData->currentRecordPage++;
+        } else {
+            scanData->currentRecordSlot++;
+        }
+
+        // Get the record at the current page and slot
+        RID id;
+        id.page = scanData->currentRecordPage;
+        id.slot = scanData->currentRecordSlot;
+        RC status = getRecord(rel, id, record);
+
+        // Check if the record matches the scan condition
+        Value *result = NULL;
+        evalExpr(record, rel->schema, scanData->condition, &result);
+        if (result->v.boolV) {
+            freeVal(result);
+            return status;
+        }
+    }
+
+    return RC_RM_NO_MORE_TUPLES;
 
 }
 extern RC closeScan (RM_ScanHandle *scan)

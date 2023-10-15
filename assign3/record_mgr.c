@@ -259,7 +259,44 @@ extern RC updateRecord (RM_TableData *rel, Record *record)
 
 extern RC getRecord (RM_TableData *rel, RID id, Record *record)
 {
+    // Check if the provided pointers are valid
+    if (rel == NULL || rel->mgmtData == NULL || record == NULL) {
+        return RC_FILE_NOT_FOUND;
+    }
 
+    // Check if the RID is valid
+    if (id.page < 0 || id.slot < 0) {
+        return RC_RM_NO_TUPLE_WITH_GIVEN_RID;
+    }
+
+    // Retrieve the record manager data
+    RecordMgr *rm = (RecordMgr *)rel->mgmtData;
+
+    // Pin the page in the buffer pool
+    pinPage(&rm->bufferPool, &rm->pageHandle, id.page);
+
+    // Calculate the offset to the slot within the page
+    int slot_offset = id.slot * getRecordSize(rel->schema);
+
+    // Check if the slot contains a valid record
+    if (slot_offset >= PAGE_SIZE || rm->pageHandle.data[slot_offset] == 0) {
+        unpinPage(&rm->bufferPool, &rm->pageHandle);
+        return RC_RM_NO_TUPLE_WITH_GIVEN_RID;
+    }
+
+    // Copy the record data from the slot to the provided Record structure
+    char *source = &rm->pageHandle.data[slot_offset];
+    char *destination = record->data;
+    memcpy(destination, source, getRecordSize(rel->schema));
+
+    // Set the record's ID
+    record->id.page = id.page;
+    record->id.slot = id.slot;
+
+    // Unpin the page
+    unpinPage(&rm->bufferPool, &rm->pageHandle);
+
+    return RC_OK;
 
 }
 

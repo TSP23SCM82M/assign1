@@ -28,6 +28,13 @@ typedef struct RecordMgr
 
 RecordMgr* recordMgr;
 
+typedef struct RM_ScanData {
+    Expr *condition;  // The condition for scanning
+    int currentRecordPage;  // The current page being scanned
+    int currentRecordSlot;  // The current slot on the current page
+    RecordMgr *recordManager;  // Reference to the Record Manager
+} RM_ScanData;
+
 
 loadSchema(Schema *schema, char *dataPointer) {
     // tuplesCount int
@@ -268,7 +275,7 @@ extern RC getRecord (RM_TableData *rel, RID id, Record *record)
     if (id.page < 0 || id.slot < 0) {
         return RC_RM_NO_TUPLE_WITH_GIVEN_RID;
     }
-23
+
     // Retrieve the record manager data
     RecordMgr *rm = (RecordMgr *)rel->mgmtData;
 
@@ -304,10 +311,24 @@ extern RC getRecord (RM_TableData *rel, RID id, Record *record)
 extern RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond)
 {
 
+if (rel == NULL || scan == NULL || cond == NULL) {
+        return RC_FILE_NOT_FOUND;
+    }
+
+    // Initialize the scan handle
+    scan->rel = rel;
+    scan->mgmtData = malloc(sizeof(RM_ScanData));
+    RM_ScanData *scanData = (RM_ScanData *)scan->mgmtData;
+    scanData->condition = cond;
+    scanData->currentRecordPage = -1;
+    scanData->currentRecordSlot = -1;
+    scanData->recordManager = (RecordMgr *)rel->mgmtData;
+
+    return RC_OK;
 
 }
-extern RC next (RM_ScanHandle *scan, Record *record)
 
+extern RC next (RM_ScanHandle *scan, Record *record)
 {
 
 
@@ -382,35 +403,6 @@ extern Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes,
     sc->typeLength = typeLength;
     sc->keySize = keySize;
     sc->keyAttrs = keys;
-    // schema->numAttr = numAttr;
-    // schema->attrNames = (char **)malloc(sizeof(char *) * numAttr);
-    // schema->dataTypes = (DataType *)malloc(sizeof(DataType) * numAttr);
-    // schema->typeLength = (int *)malloc(sizeof(int) * numAttr);
-    // schema->keySize = keySize;
-    // schema->keyAttrs = (int *)malloc(sizeof(int) * keySize);
-
-    // if (schema->attrNames == NULL || schema->dataTypes == NULL || schema->typeLength == NULL || schema->keyAttrs == NULL) {
-    //     free(schema->attrNames);
-    //     free(schema->dataTypes);
-    //     free(schema->typeLength);
-    //     free(schema->keyAttrs);
-    //     free(schema);
-    //     return NULL;
-    // }
-
-    // // Copy attribute names, data types, and type lengths
-    // for (int i = 0; i < numAttr; i++) {
-    //     schema->attrNames[i] = strdup(attrNames[i]);
-    //     schema->dataTypes[i] = dataTypes[i];
-    //     schema->typeLength[i] = typeLength[i];
-    // }
-
-    // // Copy key attributes
-    // if (keySize > 0 && keys != NULL) {
-    //     for (int i = 0; i < keySize; i++) {
-    //         schema->keyAttrs[i] = keys[i];
-    //     }
-    // }
 
     return sc;
 

@@ -175,6 +175,90 @@ extern RC openTable (RM_TableData *rel, char *name) {
     forcePage(&recordMgr->bufferPool, &recordMgr->pageHandle);
 }
 
+
+extern RC deleteRecord (RM_TableData *rel, RID id) {
+    if (rel == NULL) {
+        return RC_FILE_NOT_FOUND;
+    }
+
+    // Check if the RID is valid
+    if (id.page < 0 || id.slot < 0) {
+        return RC_RM_NO_TUPLE_WITH_GIVEN_RID;
+    }
+
+    // We have the table and the record ID. First, we need to go to the record.
+    RecordMgr *rm = (RecordMgr*)rel->mgmtData;
+
+    // Pin the page in the buffer pool
+    pinPage(&rm->bufferPool, &rm->pageHandle, id.page);
+
+    // Calculate the offset to the slot within the page
+    int slot_offset = id.slot * getRecordSize(rel->schema);
+
+    // Check if the slot contains a valid record
+    if (slot_offset >= PAGE_SIZE || rm->pageHandle.data[slot_offset] == 0) {
+        unpinPage(&rm->bufferPool, &rm->pageHandle);
+        return RC_RM_NO_TUPLE_WITH_GIVEN_RID;
+    }
+
+    // Mark the slot as empty (delete the record)
+    memset(&rm->pageHandle.data + slot_offset, 0, getRecordSize(rel->schema));
+
+    // Mark the page as dirty
+    markDirty(&rm->bufferPool, &rm->pageHandle);
+
+    // Unpin the page
+    unpinPage(&rm->bufferPool, &rm->pageHandle);
+
+    return RC_OK;
+}
+
+
+extern RC updateRecord (RM_TableData *rel, Record *record)
+{
+
+
+}
+
+
+extern RC getRecord (RM_TableData *rel, RID id, Record *record)
+{
+
+
+}
+
+// scans
+extern RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond)
+{
+
+
+}
+extern RC next (RM_ScanHandle *scan, Record *record)
+
+{
+
+
+}
+extern RC closeScan (RM_ScanHandle *scan)
+{
+
+
+}
+
+// dealing with schemas
+extern int getRecordSize (Schema *schema)
+{
+
+
+}
+
+extern Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *typeLength, int keySize, int *keys)
+{
+
+
+}
+
+
 //last 5 functions
 extern RC freeSchema (Schema *schema)
 {

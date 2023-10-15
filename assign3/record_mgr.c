@@ -268,7 +268,7 @@ extern RC getRecord (RM_TableData *rel, RID id, Record *record)
     if (id.page < 0 || id.slot < 0) {
         return RC_RM_NO_TUPLE_WITH_GIVEN_RID;
     }
-
+23
     // Retrieve the record manager data
     RecordMgr *rm = (RecordMgr *)rel->mgmtData;
 
@@ -315,6 +315,16 @@ extern RC next (RM_ScanHandle *scan, Record *record)
 extern RC closeScan (RM_ScanHandle *scan)
 {
 
+if (scan == NULL) {
+        return RC_FILE_NOT_FOUND;
+    }
+
+    if (scan->mgmtData != NULL) {
+        free(scan->mgmtData);
+        scan->mgmtData = NULL;
+    }
+
+    return RC_OK;
 
 }
 

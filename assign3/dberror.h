@@ -8,7 +8,7 @@
 // This is the maximum numbers of pages
 #define MAX_PAGES 128
 // This is the size of attribute
-#define ATTR_SIZE 32
+#define SIZE_ATTR 32
 
 /* return code definitions */
 typedef int RC;

@@ -36,8 +36,10 @@ typedef struct RM_ScanData {
 } RM_ScanData;
 
 int sizeInt = sizeof(int);
+int sizeFloat = sizeof(float);
+int sizeBool = sizeof(bool);
 
-loadSchema(Schema *schema, char *dataPointer) {
+extern RC loadSchema(Schema *schema, char *dataPointer) {
     // tuplesCount int
     // freePage int
     // schema->numAttr int
@@ -71,24 +73,29 @@ loadSchema(Schema *schema, char *dataPointer) {
 
     // We need to allocate memory for schema
     for(int k = 0; k < attrNumber; k++)
-        schema->attrNames[k]= (char*) malloc(ATTR_SIZE);
+        schema->attrNames[k]= (char*) malloc(SIZE_ATTR);
         
     for(int k = 0; k < schema->numAttr; k++)
-        {
+    {
         // set the value
-        strncpy(schema->attrNames[k], dataPointer, ATTR_SIZE);
-        // move the dataPointer to the next one
-        dataPointer = dataPointer + ATTR_SIZE;
-        
-        schema->dataTypes[k]= *(int*) dataPointer;
-        dataPointer += sizeInt;
+        strncpy(schema->attrNames[k], dataPointer, SIZE_ATTR);
+        if (k < schema->numAttr) {
+            // move the dataPointer to the next one
+            dataPointer += SIZE_ATTR;
+            
+            schema->dataTypes[k]= *(int*) dataPointer;
+            dataPointer += sizeInt;
 
-        schema->typeLength[k]= *(int*)dataPointer;
-        dataPointer += sizeInt;
+            schema->typeLength[k]= *(int*)dataPointer;
+            dataPointer += sizeInt;
+        } else {
+            return RC_ERROR;
+        }
     }
+    return RC_OK;
 }
 
-writeSchema(Schema *schema, char *dataPointer) {
+RC writeSchema(Schema *schema, char *dataPointer) {
     // This function will write schema to data
     *(int*)dataPointer = 0; 
 
@@ -108,17 +115,22 @@ writeSchema(Schema *schema, char *dataPointer) {
 
     for(int k = 0; k < schema->numAttr; k++)
     {
-        strncpy(dataPointer, schema->attrNames[k], ATTR_SIZE);
-        dataPointer = dataPointer + ATTR_SIZE;
+        strncpy(dataPointer, schema->attrNames[k], SIZE_ATTR);
+        if (k < schema->numAttr) {
+            dataPointer = dataPointer + SIZE_ATTR;
 
-        *(int*)dataPointer = (int)schema->dataTypes[k];
+            *(int*)dataPointer = (int)schema->dataTypes[k];
 
-        dataPointer += sizeInt;
+            dataPointer += sizeInt;
 
-        *(int*)dataPointer = (int) schema->typeLength[k];
+            *(int*)dataPointer = (int) schema->typeLength[k];
 
-        dataPointer += sizeInt;
+            dataPointer += sizeInt;
+        } else {
+            return RC_ERROR;
+        }
     }
+    return RC_OK;
 
 }
 
@@ -407,14 +419,28 @@ extern Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes,
     {
         return NULL;
     }
-
-    // Initialize the Schema struct members
-    sc->numAttr = numAttr;
-    sc->attrNames = attrNames;
-    sc->dataTypes = dataTypes;
-    sc->typeLength = typeLength;
-    sc->keySize = keySize;
     sc->keyAttrs = keys;
+    // Initialize the Schema struct members
+    if (numAttr <= 0) {
+        return RC_ERROR;
+    }
+    sc->keySize = keySize;
+    sc->numAttr = numAttr;
+    if (attrNames == NULL) {
+        return RC_ERROR;
+    } else {
+    sc->attrNames = attrNames;
+    }
+    if (dataTypes == NULL) {
+        return RC_ERROR;
+    } else {
+        sc->dataTypes = dataTypes;
+    }
+    if (typeLength == NULL) {
+        return RC_ERROR;
+    } else {
+        sc->typeLength = typeLength;
+    }
 
     return sc;
 
@@ -481,20 +507,19 @@ RC attrOffset(Schema *schema, int attrNum, int *result) {
     
     int attr = 0;
     *result = 0;
-    
     for (int attr = 0; attr < attrNum; attr++) {
         switch (schema->dataTypes[attr]) {
 			case DT_INT:
-                *result += sizeof(int);
+                *result += sizeInt;
                 break;
             case DT_STRING:
                 *result += schema->typeLength[attr];
                 break;
 			case DT_FLOAT:
-                *result += sizeof(float);
+                *result += sizeFloat;
                 break;
             case DT_BOOL:
-                *result += sizeof(bool);
+                *result += sizeBool;
                 break;
         }
     }
@@ -587,7 +612,8 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value)
 
 					if (attribute->v.stringV != NULL) {
 						strncpy(attribute->v.stringV, dataPointer, schema->typeLength[attrNum]);
-						attribute->v.stringV[schema->typeLength[attrNum]] = '\0';
+                        int attrLen = schema->typeLength[attrNum];
+						attribute->v.stringV[attrLen] = '\0';
 					} else {
 						RC_message = "memory allocation failure";
         				return RC_ERROR;
@@ -726,11 +752,17 @@ extern RC closeTable(RM_TableData* rel)
     record_Info* rm = rel->mgmtData;
 
     // Shutdown the Buffer Pool
-    shutdownBufferPool(&rm->bmBufferManager);
+    int res = shutdownBufferPool(&rm->bmBufferManager);
     
+    if (RC_OK != res) {
+        return RC_ERROR;
+    }
     // Free the schema
-    freeSchema(rel->schema);
+    int res = freeSchema(rel->schema);
     
+    if (RC_OK != res) {
+        return RC_ERROR;
+    }
     return RC_OK;
 }
 
@@ -751,6 +783,9 @@ extern RC deleteTable(char* name)
 extern int getNumTuples(RM_TableData* rel)
 {
 	RecordMgr* rm = rel->mgmtData;
+    if (rm == NULL) {
+        return RC_ERROR;
+    }
 	return rm->tuplesCount;
 	
 }
@@ -764,10 +799,17 @@ extern RC insertRecord(RM_TableData *rel, Record *record)
     // Try to find an available slot on an existing page
     for (recordId->page = 1; recordId->page <= mgr->numPages; recordId->page++) {
         // Pin the page
-        pinPage(&mgr->bmBufferManager, &mgr->pageHandle, recordId->page);
+        int res = pinPage(&mgr->bmBufferManager, &mgr->pageHandle, recordId->page);
+        if (RC_OK != res) {
+            return RC_ERROR;
+        }
 
         // Find an empty slot on the page
-        recordId->slot = Page_empty_slot(getRecordSize(rel->schema), mgr->pageHandle.data);
+        int size = getRecordSize(rel->schema), mgr->pageHandle.data;
+        if (size == -1) {
+            return RC_ERROR;
+        }
+        recordId->slot = Page_empty_slot(size);
 
         if (recordId->slot >= 0) {
             // Mark the page as dirty, as we are modifying it
@@ -805,7 +847,11 @@ extern RC insertRecord(RM_TableData *rel, Record *record)
     pinPage(&mgr->bmBufferManager, &mgr->pageHandle, recordId->page);
 
     // Find the first slot on the new page
-    recordId->slot = Page_empty_slot(getRecordSize(rel->schema), mgr->pageHandle.data);
+    int size = getRecordSize(rel->schema), mgr->pageHandle.data;
+    if (size == -1) {
+        return RC_ERROR;
+    }
+    recordId->slot = Page_empty_slot(size);
 
     // Mark the page as dirty, as we are modifying it
     markDirty(&mgr->bmBufferManager, &mgr->pageHandle);

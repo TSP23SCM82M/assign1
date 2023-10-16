@@ -28,6 +28,24 @@ typedef struct RecordMgr
 
 RecordMgr* recordMgr;
 
+c
+// Function to find a free slot in the data page : Required for InsertRecord
+int FreeSlot(char *data, int recordSize)
+{
+    int i = 0;                                   
+    int totalSlots = PAGE_SIZE / recordSize;   // Calculate total number of slots
+
+    while (i < totalSlots)                       
+    {
+        if (data[i * recordSize] != '+') {      // Check if the slot is free
+            return i;                             // Return the index of the free slot
+        }
+        i++;                                      
+    }
+
+    return -1;                                    // Return -1 if no free slot is found
+}
+
 typedef struct RM_ScanData {
     Expr *condition;  // The condition for scanning
     int currentRecordPage;  // The current page being scanned
@@ -176,13 +194,13 @@ extern RC openTable (RM_TableData *rel, char *name) {
 extern RC closeTable(RM_TableData* rel)
 {
     // Store the table's metadata before closing it
-    record_Info* rm = rel->mgmtData;
+    RecordMgr* recordMgr = rel->mgmtData;
 
     // Shutdown the Buffer Pool
-    shutdownBufferPool(&rm->bmBufferManager);
+    shutdownBufferPool(&recordMgr->bufferPool);
     
     // Free the schema
-    freeSchema(rel->schema);
+    rel->mgmtData = Null;
     
     return RC_OK;
 }
@@ -204,47 +222,44 @@ extern RC deleteTable(char* name)
 
 extern int getNumTuples(RM_TableData* rel)
 {
-	record_Info* rm = rel->mgmtData;
-	return rm->tuple_count;
+	RecordMgr* recordMgr = rel->mgmtData;
+	return recordMgr->tuplesCount;
 	
 }
 
 extern RC insertRecord(RM_TableData *rel, Record *record)
 {
-    record_Info *mgr = rel->mgmtData;
+    RecordMgr* recordMgr = rel->mgmtData;
     RC returnCode = RC_OK;
-    RID *recordId = &record->id;
+    RID *recordID = &record->id;
+    char *data, *slot_p;
+    int recordSize = getRecordSize(rel->schema);
 
-    for (recordId->page = mgr->firstEmptySlot; ; recordId->page++) {
-        pinPage(&mgr->bmBufferManager, &mgr->pageHandle, recordId->page);
-        recordId->slot = Page_empty_slot(getRecordSize(rel->schema), mgr->pageHandle.data);
+    recordID->page = recordMgr->freePage;
+    
+    do {
+        pinPage(&recordMgr->bufferPool, &recordMgr->pageHandle, recordID->page);
+        data = recordMgr->pageHandle.data;
+        recordID->slot = FreeSlot(data, recordSize);
 
-        if (recordId->slot >= 0) {
-            break;  // Found an empty slot, break the loop
+        if (recordID->slot == -1) {
+            unpinPage(&recordMgr->bufferPool, &recordMgr->pageHandle);
+            recordID->page++;
         }
+    } while (recordID->slot == -1);
 
-        unpinPage(&mgr->bmBufferManager, &mgr->pageHandle);
-    }
-
-    markDirty(&mgr->bmBufferManager, &mgr->pageHandle);
-
-    char *slotp = mgr->pageHandle.data;
-    int add = recordId->slot * getRecordSize(rel->schema);
-
-    slotp = slotp + add;
-    *slotp = '$';
-
-    memcpy(slotp + 1, record->data + 1, getRecordSize(rel->schema) - 1);
-
-    unpinPage(&mgr->bmBufferManager, &mgr->pageHandle);
-
-    mgr->tuple_count = mgr->tuple_count + 1;
-
-    int null_value = 0;
-    pinPage(&mgr->bmBufferManager, &mgr->pageHandle, null_value);
+    slot_p = data;
+    markDirty(&recordMgr->bufferPool, &recordMgr->pageHandle);
+    slot_p += recordID->slot * recordSize;
+    *slot_p = '+';
+    memcpy(++slot_p, record->data + 1, recordSize - 1);
+    unpinPage(&recordMgr->bufferPool, &recordMgr->pageHandle);
+    recordMgr->tuplesCount++;
+    pinPage(&recordMgr->bufferPool, &recordMgr->pageHandle, 0);
 
     return returnCode;
 }
+
 
 
 extern RC deleteRecord (RM_TableData *rel, RID id) {

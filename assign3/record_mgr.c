@@ -173,6 +173,80 @@ extern RC openTable (RM_TableData *rel, char *name) {
     forcePage(&recordMgr->bufferPool, &recordMgr->pageHandle);
 }
 
+extern RC closeTable(RM_TableData* rel)
+{
+    // Store the table's metadata before closing it
+    record_Info* rm = rel->mgmtData;
+
+    // Shutdown the Buffer Pool
+    shutdownBufferPool(&rm->bmBufferManager);
+    
+    // Free the schema
+    freeSchema(rel->schema);
+    
+    return RC_OK;
+}
+
+extern RC deleteTable(char* name)
+{
+    RC result;
+    while (1) {
+        result = destroyPageFile(name);
+        if (result != RC_OK) 
+        {
+            return RC_FILE_NOT_FOUND; // File not found, no need to delete
+        } else {
+                return result; // Some other error occurred during deletion
+            }
+        }
+    return RC_OK; // File was successfully deleted
+}
+
+extern int getNumTuples(RM_TableData* rel)
+{
+	record_Info* rm = rel->mgmtData;
+	return rm->tuple_count;
+	
+}
+
+extern RC insertRecord(RM_TableData *rel, Record *record)
+{
+    record_Info *mgr = rel->mgmtData;
+    RC returnCode = RC_OK;
+    RID *recordId = &record->id;
+
+    for (recordId->page = mgr->firstEmptySlot; ; recordId->page++) {
+        pinPage(&mgr->bmBufferManager, &mgr->pageHandle, recordId->page);
+        recordId->slot = Page_empty_slot(getRecordSize(rel->schema), mgr->pageHandle.data);
+
+        if (recordId->slot >= 0) {
+            break;  // Found an empty slot, break the loop
+        }
+
+        unpinPage(&mgr->bmBufferManager, &mgr->pageHandle);
+    }
+
+    markDirty(&mgr->bmBufferManager, &mgr->pageHandle);
+
+    char *slotp = mgr->pageHandle.data;
+    int add = recordId->slot * getRecordSize(rel->schema);
+
+    slotp = slotp + add;
+    *slotp = '$';
+
+    memcpy(slotp + 1, record->data + 1, getRecordSize(rel->schema) - 1);
+
+    unpinPage(&mgr->bmBufferManager, &mgr->pageHandle);
+
+    mgr->tuple_count = mgr->tuple_count + 1;
+
+    int null_value = 0;
+    pinPage(&mgr->bmBufferManager, &mgr->pageHandle, null_value);
+
+    return returnCode;
+}
+
+
 extern RC deleteRecord (RM_TableData *rel, RID id) {
     if (rel == NULL || rel->mgmtData == NULL) {
         return RC_FILE_NOT_FOUND;

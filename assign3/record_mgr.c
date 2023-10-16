@@ -35,6 +35,7 @@ typedef struct RM_ScanData {
     RecordMgr *recordManager;  // Reference to the Record Manager
 } RM_ScanData;
 
+int sizeInt = sizeof(int);
 
 loadSchema(Schema *schema, char *dataPointer) {
     // tuplesCount int
@@ -45,94 +46,78 @@ loadSchema(Schema *schema, char *dataPointer) {
     // schema->typeLength int * schema->numAttr
     // This function will load schema from data
     schema->numAttr = *(int *)dataPointer;
-    dataPointer += sizeof(int);
+    dataPointer += sizeInt;
 
     // Retrieving total number of tuples from the page file
     recordMgr->tuplesCount= *(int*)dataPointer;
-    dataPointer = dataPointer + sizeof(int);
+    dataPointer += sizeInt;
 
     // Getting free page from the page file
     recordMgr->freePage= *(int*) dataPointer;
-    dataPointer = dataPointer + sizeof(int);
+    dataPointer += sizeInt;
 
     // Getting the number of attributes from the page file
-    int attributeCount = *(int*)dataPointer;
-    dataPointer = dataPointer + sizeof(int);
+    int attrNumber = *(int*)dataPointer;
+    dataPointer += sizeInt;
 
     Schema *schema;
 
-    // Allocating memory space to 'schema'
     schema = (Schema*) malloc(sizeof(Schema));
 
-    // Setting schema's parameters
-    schema->numAttr = attributeCount;
-    schema->attrNames = (char**) malloc(sizeof(char*) *attributeCount);
-    schema->dataTypes = (DataType*) malloc(sizeof(DataType) *attributeCount);
-    schema->typeLength = (int*) malloc(sizeof(int) *attributeCount);
+    schema->typeLength = (int*) malloc(attrNumber * sizeInt);
+    schema->dataTypes = (DataType*) malloc(attrNumber * sizeof(DataType));
+    schema->attrNames = (char**) malloc(attrNumber * sizeof(char*));
+    schema->numAttr = attrNumber;
 
-    // Allocate memory space for storing attribute name for each attribute
-    for(int k = 0; k < attributeCount; k++)
+    // We need to allocate memory for schema
+    for(int k = 0; k < attrNumber; k++)
         schema->attrNames[k]= (char*) malloc(ATTR_SIZE);
         
     for(int k = 0; k < schema->numAttr; k++)
         {
-        // Setting attribute name
+        // set the value
         strncpy(schema->attrNames[k], dataPointer, ATTR_SIZE);
+        // move the dataPointer to the next one
         dataPointer = dataPointer + ATTR_SIZE;
         
-        // Setting data type of attribute
         schema->dataTypes[k]= *(int*) dataPointer;
-        dataPointer = dataPointer + sizeof(int);
+        dataPointer += sizeInt;
 
-        // Setting length of datatype (length of STRING) of the attribute
         schema->typeLength[k]= *(int*)dataPointer;
-        dataPointer = dataPointer + sizeof(int);
+        dataPointer += sizeInt;
     }
 }
 
 writeSchema(Schema *schema, char *dataPointer) {
     // This function will write schema to data
-    // Setting number of tuples to 0
     *(int*)dataPointer = 0; 
 
-    // Incrementing pointer by sizeof(int) because 0 is an integer
-    dataPointer = dataPointer + sizeof(int);
+    dataPointer += sizeInt;
 
-    // Setting first page to 1 since 0th page if for schema and other meta data
     *(int*)dataPointer = 1;
 
-    // Incrementing pointer by sizeof(int) because 1 is an integer
-    dataPointer = dataPointer + sizeof(int);
+    dataPointer += sizeInt;
 
-    // Setting the number of attributes
     *(int*)dataPointer = schema->numAttr;
 
-    // Incrementing pointer by sizeof(int) because number of attributes is an integer
-    dataPointer = dataPointer + sizeof(int); 
+    dataPointer += sizeInt; 
 
-    // Setting the Key Size of the attributes
     *(int*)dataPointer = schema->keySize;
 
-    // Incrementing pointer by sizeof(int) because Key Size of attributes is an integer
-    dataPointer = dataPointer + sizeof(int);
+    dataPointer += sizeInt;
 
     for(int k = 0; k < schema->numAttr; k++)
     {
-        // Setting attribute name
         strncpy(dataPointer, schema->attrNames[k], ATTR_SIZE);
         dataPointer = dataPointer + ATTR_SIZE;
 
-        // Setting data type of attribute
         *(int*)dataPointer = (int)schema->dataTypes[k];
 
-        // Incrementing pointer by sizeof(int) because we have data type using integer constants
-        dataPointer = dataPointer + sizeof(int);
+        dataPointer += sizeInt;
 
-        // Setting length of datatype of the attribute
         *(int*)dataPointer = (int) schema->typeLength[k];
 
-        // Incrementing pointer by sizeof(int) because type length is an integer
-        dataPointer = dataPointer + sizeof(int);
+        dataPointer += sizeInt;
     }
 
 }
@@ -152,23 +137,17 @@ extern RC createTable (char *name, Schema *schema) {
     char pageData[PAGE_SIZE];
     char *dataPointer = pageData;
     writeSchema(schema, dataPointer);
-    RC result;
     SM_FileHandle fileHandle;
-    // Creating a page file page name as table name using storage manager
-    if((result = createPageFile(name)) != RC_OK)
-        return result;
+    if(0 != createPageFile(name))
+        return RC_ERROR;
+    if(0 != openPageFile(name, &fileHandle))
+        return RC_ERROR;
         
-    // Opening the newly created page
-    if((result = openPageFile(name, &fileHandle)) != RC_OK)
-        return result;
+    if(0 != writeBlock(0, &fileHandle, pageData))
+        return RC_ERROR;
         
-    // Writing the schema to first location of the page file
-    if((result = writeBlock(0, &fileHandle, pageData)) != RC_OK)
-        return result;
-        
-    // Closing the file after writing
-    if((result = closePageFile(&fileHandle)) != RC_OK)
-        return result;
+    if(0 != closePageFile(&fileHandle))
+        return RC_ERROR;
     initBufferPool(&recordMgr->bufferPool, name, MAX_PAGES, RS_LRU, NULL);
 }
 extern RC openTable (RM_TableData *rel, char *name) {
@@ -771,14 +750,14 @@ extern RC deleteTable(char* name)
 
 extern int getNumTuples(RM_TableData* rel)
 {
-	record_Info* rm = rel->mgmtData;
-	return rm->tuple_count;
+	RecordMgr* rm = rel->mgmtData;
+	return rm->tuplesCount;
 	
 }
 
 extern RC insertRecord(RM_TableData *rel, Record *record)
 {
-    record_Info *mgr = rel->mgmtData;
+    RecordMgr *mgr = rel->mgmtData;
     RC returnCode = RC_OK;
     RID *recordId = &record->id;
 

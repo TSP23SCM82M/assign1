@@ -4,6 +4,7 @@
 #include "dt.h"
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include "record_mgr.h"
 #include "buffer_mgr.h"
 #include "storage_mgr.h"

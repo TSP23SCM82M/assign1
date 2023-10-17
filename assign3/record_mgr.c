@@ -200,7 +200,7 @@ extern RC closeTable(RM_TableData* rel)
     shutdownBufferPool(&recordMgr->bufferPool);
     
     // Free the schema
-    rel->mgmtData = Null;
+    rel->mgmtData = NULL;
     
     return RC_OK;
 }

@@ -776,7 +776,7 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value)
 
 extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value)
 {
-	int length;
+	//int length;
 	int offset = 0;
 
 	if (schema == NULL || record == NULL || value == NULL) {

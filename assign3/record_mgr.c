@@ -29,7 +29,7 @@ typedef struct RecordMgr
 
 RecordMgr* recordMgr;
 
-c
+
 // Function to find a free slot in the data page : Required for InsertRecord
 int FreeSlot(char *data, int recordSize)
 {
@@ -595,7 +595,7 @@ RC attrOffset(Schema *schema, int attrNum, int *result) {
         return RC_ERROR;
     }
     
-    int attr = 0;
+    //int attr = 0;
     *result = 0;
     for (int attr = 0; attr < attrNum; attr++) {
         switch (schema->dataTypes[attr]) {
@@ -765,7 +765,7 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value)
 			RC_message = "Invalid attribute type or NULL data pointer"; // Handle invalid type or NULL pointer
 			return RC_ERROR;
 		}
-		value = attribute;
+		//value = attribute;
 		return RC_OK;
 	}
 

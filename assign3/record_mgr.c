@@ -177,16 +177,26 @@ extern RC openTable (RM_TableData *rel, char *name) {
     Schema *schema;
 	schema = (Schema*) malloc(sizeof(Schema));
 	// Pinning a page i.e. putting a page in Buffer Pool using Buffer Manager
-	pinPage(&recordMgr->bufferPool, &recordMgr->pageHandle, 0);
+	RC code = pinPage(&recordMgr->bufferPool, &recordMgr->pageHandle, 0);
+	if (RC_OK != code) {
+		return RC_ERROR;
+	}
 	// Setting table's meta data to our custom record manager meta data structure
 	rel->mgmtData = recordMgr;
 	// Setting the table's name
 	rel->name = name;
     loadSchema(schema);
 	rel->schema = schema;
-    unpinPage(&recordMgr->bufferPool, &recordMgr->pageHandle);
+    code = unpinPage(&recordMgr->bufferPool, &recordMgr->pageHandle);
+	if (RC_OK != code) {
+		return RC_ERROR;
+	}
 
-    forcePage(&recordMgr->bufferPool, &recordMgr->pageHandle);
+    code = forcePage(&recordMgr->bufferPool, &recordMgr->pageHandle);
+	if (RC_OK != code) {
+		return RC_ERROR;
+	}
+
 	return RC_OK;
 }
 
@@ -211,7 +221,7 @@ extern RC deleteTable(char* name)
         result = destroyPageFile(name);
         if (result != RC_OK) 
         {
-            return RC_FILE_NOT_FOUND; // File not found, no need to delete
+            return RC_ERROR; // File not found, no need to delete
         } else {
                 return result; // Some other error occurred during deletion
             }
@@ -222,6 +232,9 @@ extern RC deleteTable(char* name)
 extern int getNumTuples(RM_TableData* rel)
 {
 	RecordMgr* recordMgr = rel->mgmtData;
+	if (!recordMgr) {
+		return RC_ERROR;
+	}
 	return recordMgr->tuplesCount;
 	
 }
@@ -231,6 +244,9 @@ extern RC insertRecord(RM_TableData *rel, Record *record)
     RecordMgr* recordMgr = rel->mgmtData;
     RC returnCode = RC_OK;
     RID *recordID = &record->id;
+	if (!recordID) {
+		return RC_ERROR;
+	}
     char *data, *slot_p;
     int recordSize = getRecordSize(rel->schema);
 
@@ -249,12 +265,21 @@ extern RC insertRecord(RM_TableData *rel, Record *record)
 
     slot_p = data;
     markDirty(&recordMgr->bufferPool, &recordMgr->pageHandle);
-    slot_p += recordID->slot * recordSize;
+	int size = recordID->slot;
+	size *= recordSize;
+    slot_p += size;
     *slot_p = '+';
-    memcpy(++slot_p, record->data + 1, recordSize - 1);
-    unpinPage(&recordMgr->bufferPool, &recordMgr->pageHandle);
+	slot_p += 1;
+    memcpy(slot_p, record->data + 1, recordSize - 1);
+    RC code = unpinPage(&recordMgr->bufferPool, &recordMgr->pageHandle);
+	if (RC_OK != code) {
+		return RC_ERROR;
+	}
     recordMgr->tuplesCount++;
-    pinPage(&recordMgr->bufferPool, &recordMgr->pageHandle, 0);
+    code = pinPage(&recordMgr->bufferPool, &recordMgr->pageHandle, 0);
+	if (RC_OK != code) {
+		return RC_ERROR;
+	}
 
     return returnCode;
 }
@@ -275,14 +300,20 @@ extern RC deleteRecord (RM_TableData *rel, RID id) {
     RecordMgr *rm = (RecordMgr*)rel->mgmtData;
 
     // Pin the page in the buffer pool
-    pinPage(&rm->bufferPool, &rm->pageHandle, id.page);
+    RC code = pinPage(&rm->bufferPool, &rm->pageHandle, id.page);
+	if (RC_OK != code) {
+		return RC_ERROR;
+	}
 
     // Calculate the offset to the slot within the page
     int slot_offset = id.slot * getRecordSize(rel->schema);
 
     // Check if the slot contains a valid record
     if (slot_offset >= PAGE_SIZE || rm->pageHandle.data[slot_offset] == 0) {
-        unpinPage(&rm->bufferPool, &rm->pageHandle);
+        RC code = unpinPage(&rm->bufferPool, &rm->pageHandle);
+		if (RC_OK != code) {
+			return RC_ERROR;
+		}
         return RC_RM_NO_TUPLE_WITH_GIVEN_RID;
     }
 
@@ -290,10 +321,16 @@ extern RC deleteRecord (RM_TableData *rel, RID id) {
     memset(&rm->pageHandle.data + slot_offset, 0, getRecordSize(rel->schema));
 
     // Mark the page as dirty
-    markDirty(&rm->bufferPool, &rm->pageHandle);
+    RC res = markDirty(&rm->bufferPool, &rm->pageHandle);
+	if (res && res != RC_OK) {
+		return RC_ERROR;
+	}
 
     // Unpin the page
-    unpinPage(&rm->bufferPool, &rm->pageHandle);
+    res = unpinPage(&rm->bufferPool, &rm->pageHandle);
+	if (res && res != RC_OK) {
+		return RC_ERROR;
+	}
 
     return RC_OK;
 }
@@ -322,7 +359,10 @@ extern RC updateRecord (RM_TableData *rel, Record *record)
 
     // Check if the slot contains a valid record
     if (slot_offset >= PAGE_SIZE || rm->pageHandle.data[slot_offset] == 0) {
-        unpinPage(&rm->bufferPool, &rm->pageHandle);
+        RC unpinCode = unpinPage(&rm->bufferPool, &rm->pageHandle);
+		if (unpinCode || unpinCode != RC_OK) {
+			return RC_ERROR;
+		}
         return RC_RM_NO_TUPLE_WITH_GIVEN_RID;
     }
 
@@ -336,7 +376,10 @@ extern RC updateRecord (RM_TableData *rel, Record *record)
     markDirty(&rm->bufferPool, &rm->pageHandle);
 
     // Unpin the page
-    unpinPage(&rm->bufferPool, &rm->pageHandle);
+    RC res = unpinPage(&rm->bufferPool, &rm->pageHandle);
+	if (res && res != RC_OK) {
+		return res;
+	}
 
     return RC_OK;
 
@@ -380,7 +423,10 @@ extern RC getRecord (RM_TableData *rel, RID id, Record *record)
     record->id.slot = id.slot;
 
     // Unpin the page
-    unpinPage(&rm->bufferPool, &rm->pageHandle);
+    RC code = unpinPage(&rm->bufferPool, &rm->pageHandle);
+	if (code && code != RC_OK) {
+		return code;
+	}
 
     return RC_OK;
 
@@ -390,8 +436,8 @@ extern RC getRecord (RM_TableData *rel, RID id, Record *record)
 extern RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond)
 {
 
-    if (cond == NULL){
-		return RC_SCAN_CONDITION_NOT_FOUND;
+    if (NULL == cond){
+		return RC_SCAN_CONDITION_NOT_FOUND || RC_ERROR;
 	}
 
 if (rel == NULL || scan == NULL) {
@@ -399,14 +445,14 @@ if (rel == NULL || scan == NULL) {
     }
 
 	openTable(rel, rel->name);
-    RecordMgr scanMgr = (RecordMgr*) malloc(sizeof(RecordMgr));
+    RecordMgr *scanMgr = (RecordMgr*) malloc(sizeof(RecordMgr));
     scanMgr->recordID.page = 1;
 	scanMgr->recordID.slot = 0;  	
 	scanMgr->scanCount = 0;
     scanMgr->condition = cond;
     
    
-    RecordMgr tableMgr = rel->mgmtData;
+    RecordMgr *tableMgr = rel->mgmtData;
     tableMgr->tuplesCount = SIZE_ATTR;
 
     	
@@ -416,52 +462,6 @@ if (rel == NULL || scan == NULL) {
     return RC_OK;
 
 }
-
-
-
-// extern RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond)
-// {
-// 	// Checking if scan condition (test expression) is present
-// 	if (cond == NULL)
-// 	{
-// 		return RC_SCAN_CONDITION_NOT_FOUND;
-// 	}
-
-// 	// Open the table in memory
-// 	openTable(rel, "ScanTable");
-
-//     	RecordMgr *scanManager;
-// 	RecordMgr *tableManager;
-
-// 	// Allocating some memory to the scanManager
-//     	scanManager = (RecordMgr*) malloc(sizeof(RecordMgr));
-    	
-// 	// Setting the scan's meta data to our meta data
-//     	scan->mgmtData = scanManager;
-    	
-// 	// 1 to start scan from the first page
-//     	scanManager->recordID.page = 1;
-    	
-// 	// 0 to start scan from the first slot	
-// 	scanManager->recordID.slot = 0;
-	
-// 	// 0 because this just initializing the scan. No records have been scanned yet    	
-// 	scanManager->scanCount = 0;
-
-// 	// Setting the scan condition
-//     	scanManager->condition = cond;
-    	
-// 	// Setting the our meta data to the table's meta data
-//     	tableManager = rel->mgmtData;
-
-// 	// Setting the tuple count
-//     	tableManager->tuplesCount = SIZE_ATTR;
-
-// 	// Setting the scan's table i.e. the table which has to be scanned using the specified condition
-//     	scan->rel= rel;
-
-// 	return RC_OK;
-// }
 
 
 extern RC next(RM_ScanHandle *scan, Record *record)
@@ -492,27 +492,51 @@ extern RC next(RM_ScanHandle *scan, Record *record)
         return RC_RM_NO_MORE_TUPLES;
     }
 
-    while (1)
+    while (tuplesCount >= scanManager->scanCount)
     {
+		if (0 >= scanManager->scanCount)
+		{
+			scanManager->recordID.slot = 0;
+			scanManager->recordID.page = 1;
+		}
+		else
+		{
+			scanManager->recordID.slot += 1;
+			if(scanManager->recordID.slot < totalSlots)
+			{ } else {
+				scanManager->recordID.page += 1;
+				scanManager->recordID.slot = 0;
+			}
+		}
+
         // Pin the page
         pinPage(&tableManager->bufferPool, &scanManager->pageHandle, scanManager->recordID.page);
-        char *data = scanManager->pageHandle.data;
+        BM_PageHandle pageHandle = scanManager->pageHandle;
+		char *data = pageHandle.data;
 
+		int size = scanManager->recordID.slot;
+		size *= recordSize;
         // Calculate the data location from the record's slot and record size
-        data = data + (scanManager->recordID.slot * recordSize);
+        data += size;
 
         // Set the record's ID
-        record->id.page = scanManager->recordID.page;
-        record->id.slot = scanManager->recordID.slot;
+		RID recordID = scanManager->recordID;
+        record->id.page = recordID.page;
+        record->id.slot = recordID.slot;
 
         // Initialize the record data's first location with Tombstone mechanism
-        char *dataPointer = record->data;
+		char *dataPointer;
+        if (!&recordID) {
+			RC_message = "recordID is empty";
+		}
+		dataPointer = record->data;
         *dataPointer = '-';
 
         // Copy the data from the page to the record
-        memcpy(++dataPointer, data + 1, recordSize - 1);
+		dataPointer += 1;
+        memcpy(dataPointer, data + 1, recordSize - 1);
 
-        scanManager->scanCount++;
+        scanManager->scanCount += 1;
 
         // Test the record for the specified condition (test expression)
         evalExpr(record, schema, scanManager->condition, &result);
@@ -525,160 +549,16 @@ extern RC next(RM_ScanHandle *scan, Record *record)
         }
 
         // Move to the next page or slot
-        scanManager->recordID.slot++;
-        if (scanManager->recordID.slot >= totalSlots)
+        scanManager->recordID.slot += 1;
+        if (totalSlots > scanManager->recordID.slot)
         {
+        } else {
             scanManager->recordID.slot = 0;
-            scanManager->recordID.page++;
-        }
+            scanManager->recordID.page += 1;
+		}
     }
+	return RC_RM_NO_MORE_TUPLES;
 }
-
-// extern RC next1 (RM_ScanHandle *scan, Record *record)
-// {
-
-//   if (scan == NULL || record == NULL) {
-//         return RC_FILE_NOT_FOUND;
-//     }
-
-//     RM_ScanData *scanData = (RM_ScanData *)scan->mgmtData;
-//     RecordMgr *rm = scanData->recordManager;
-//     RM_TableData *rel = scan->rel;
-
-//     // Loop through pages and slots to find the next matching record
-//     while (scanData->currentRecordPage < rm->freePage) {
-//         // Move to the next page or slot
-//         if (scanData->currentRecordSlot + 1 >= rel->schema->numAttr) {
-//             scanData->currentRecordSlot = 0;
-//             scanData->currentRecordPage++;
-//         } else {
-//             scanData->currentRecordSlot++;
-//         }
-
-//         // Get the record at the current page and slot
-//         RID id;
-//         id.page = scanData->currentRecordPage;
-//         id.slot = scanData->currentRecordSlot;
-//         RC status = getRecord(rel, id, record);
-
-//         // Check if the record matches the scan condition
-//         Value *result = NULL;
-//         evalExpr(record, rel->schema, scanData->condition, &result);
-//         if (result->v.boolV) {
-//             freeVal(result);
-//             return status;
-//         }
-//     }
-
-//     return RC_RM_NO_MORE_TUPLES;
-
-// }
-// extern RC next (RM_ScanHandle *scan, Record *record)
-// {
-// 	// Initiliazing scan data
-// 	RecordMgr *scanManager = scan->mgmtData;
-// 	RecordMgr *tableManager = scan->rel->mgmtData;
-//     	Schema *schema = scan->rel->schema;
-	
-// 	// Checking if scan condition (test expression) is present
-// 	if (scanManager->condition == NULL)
-// 	{
-// 		return RC_SCAN_CONDITION_NOT_FOUND;
-// 	}
-
-// 	Value *result = (Value *) malloc(sizeof(Value));
-   
-// 	char *data;
-   	
-// 	// Getting record size of the schema
-// 	int recordSize = getRecordSize(schema);
-
-// 	// Calculating Total number of slots
-// 	int totalSlots = PAGE_SIZE / recordSize;
-
-// 	// Getting Scan Count
-// 	int scanCount = scanManager->scanCount;
-
-// 	// Getting tuples count of the table
-// 	int tuplesCount = tableManager->tuplesCount;
-
-// 	// Checking if the table contains tuples. If the tables doesn't have tuple, then return respective message code
-// 	if (tuplesCount == 0)
-// 		return RC_RM_NO_MORE_TUPLES;
-
-// 	// Iterate through the tuples
-// 	while(scanCount <= tuplesCount)
-// 	{  
-// 		// If all the tuples have been scanned, execute this block
-// 		if (scanCount <= 0)
-// 		{
-// 			// printf("INSIDE If scanCount <= 0 \n");
-// 			// Set PAGE and SLOT to first position
-// 			scanManager->recordID.page = 1;
-// 			scanManager->recordID.slot = 0;
-// 		}
-// 		else
-// 		{
-// 			// printf("INSIDE Else scanCount <= 0 \n");
-// 			scanManager->recordID.slot++;
-
-// 			// If all the slots have been scanned execute this block
-// 			if(scanManager->recordID.slot >= totalSlots)
-// 			{
-// 				scanManager->recordID.slot = 0;
-// 				scanManager->recordID.page++;
-// 			}
-// 		}
-
-// 		// Pinning the page i.e. putting the page in buffer pool
-// 		pinPage(&tableManager->bufferPool, &scanManager->pageHandle, scanManager->recordID.page);
-			
-// 		// Retrieving the data of the page			
-// 		data = scanManager->pageHandle.data;
-
-// 		// Calulate the data location from record's slot and record size
-// 		data = data + (scanManager->recordID.slot * recordSize);
-		
-// 		// Set the record's slot and page to scan manager's slot and page
-// 		record->id.page = scanManager->recordID.page;
-// 		record->id.slot = scanManager->recordID.slot;
-
-// 		// Intialize the record data's first location
-// 		char *dataPointer = record->data;
-
-// 		// '-' is used for Tombstone mechanism.
-// 		*dataPointer = '-';
-		
-// 		memcpy(++dataPointer, data + 1, recordSize - 1);
-
-// 		// Increment scan count because we have scanned one record
-// 		scanManager->scanCount++;
-// 		scanCount++;
-
-// 		// Test the record for the specified condition (test expression)
-// 		evalExpr(record, schema, scanManager->condition, &result); 
-
-// 		// v.boolV is TRUE if the record satisfies the condition
-// 		if(result->v.boolV == TRUE)
-// 		{
-// 			// Unpin the page i.e. remove it from the buffer pool.
-// 			unpinPage(&tableManager->bufferPool, &scanManager->pageHandle);
-// 			// Return SUCCESS			
-// 			return RC_OK;
-// 		}
-// 	}
-	
-// 	// Unpin the page i.e. remove it from the buffer pool.
-// 	unpinPage(&tableManager->bufferPool, &scanManager->pageHandle);
-	
-// 	// Reset the Scan Manager's values
-// 	scanManager->recordID.page = 1;
-// 	scanManager->recordID.slot = 0;
-// 	scanManager->scanCount = 0;
-	
-// 	// None of the tuple satisfy the condition and there are no more tuples to scan
-// 	return RC_RM_NO_MORE_TUPLES;
-// }
 
 extern RC closeScan (RM_ScanHandle *scan)
 {
@@ -865,9 +745,13 @@ extern RC freeRecord (Record *record)
 
 extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value)
 {
-	int offset = 0;
+	
 	char *dataPointer = NULL;
 	Value *attribute = NULL;
+	if (dataPointer || attribute) {
+		return RC_ERROR;
+	}
+	int offset = 0;
 
 	if (schema == NULL || record == NULL) {
 		RC_message = "Invalid parameter";

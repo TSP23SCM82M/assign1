@@ -83,3 +83,10 @@
 **extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value):**
 
     With the use of arguments, the setAttr function transfers data between the record, schema, and attribute number while allocating memory for the Value data and determining the data type. It is in charge of determining the value of the property.
+
+**Team Members**
+Anwesha Nayak(A20512145): 20%
+Taufeeq Ahmed Mohammed(A20512082): 20%
+Shruti Shankar Shete(A20518508): 20%
+Jianqi Jin(A20523325): 20%
+Syed Zoraiz Sibtain (A20521018): 20%

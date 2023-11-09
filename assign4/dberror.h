@@ -31,6 +31,9 @@ typedef int RC;
 #define RC_IM_N_TO_LAGE 302
 #define RC_IM_NO_MORE_ENTRIES 303
 #define RC_PAGE_PINNED_IN_BUFFER_POOL 304
+#define RC_INSERT_ERROR 305
+#define RC_ORDER_TOO_HIGH_FOR_PAGE 306
+#define RC_NO_RECORDS_TO_SCAN 307
 #define RC_ERROR 999
 /* holder for error messages */
 extern char *RC_message;

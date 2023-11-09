@@ -10,6 +10,8 @@ pre:
 	gcc -g -Wall -c record_mgr.c -o output/record_mgr.o
 	gcc -g -Wall -c expr.c -o output/expr.o
 	gcc -g -Wall -c rm_serializer.c -o output/rm_serializer.o
+	gcc -g -Wall -c btree_implement.c -o output/btree_implement.o
+	gcc -g -Wall -c btree_mgr.c -o output/btree_mgr.o
 	
 test1:
 	gcc -Wall -c test_assign1_1.c -o output/test_assign1_1.o
@@ -29,6 +31,9 @@ test2_4: # CLOCK
 test3:
 	gcc -g -Wall -c test_assign3_1.c -o output/test_assign3_1.o
 	gcc -g -Wall output/dberror.o output/expr.o output/record_mgr.o output/rm_serializer.o output/storage_mgr.o output/buffer_mgr_stat.o output/buffer_mgr.o output/test_assign3_1.o -o output/test3.o
+test4:
+	gcc -g -Wall -c test_assign4_1.c -o output/test_assign4_1.o
+	gcc -g -Wall output/dberror.o output/expr.o output/record_mgr.o output/rm_serializer.o output/storage_mgr.o output/buffer_mgr_stat.o output/buffer_mgr.o output/btree_implement.o output/btree_mgr.o output/test_assign4_1.o -o output/test4.o
 
 clean:
 	rm -rf output
@@ -43,6 +48,7 @@ all:
 	make test2_3
 	make test2_4
 	make test3
+	make test4
 
 run:
 	./output/test1.o

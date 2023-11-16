@@ -239,3 +239,193 @@ extern char *printTree(BTreeHandle *tree)
   // Return an 'empty string' as the function's required return type is char*.
   return '\0';
 }
+
+// Anwesha Nayak start
+
+// Global variable to store the index manager data
+IndexManager *treeManager = NULL;
+
+extern RC initIndexManager (void *mgmtData)
+{
+  initStorageManager();
+    
+  // Allocate memory for IndexManager
+  treeManager = (IndexManager *)malloc(sizeof(IndexManager));
+  if (treeManager == NULL) 
+  {
+      return RC_ERROR;
+  }
+
+  // Initialize IndexManager
+    treeManager->order = 0;
+    treeManager->numNodes = 0;
+    treeManager->numEntries = 0;
+    treeManager->root = NULL;
+    treeManager->queue = NULL;
+    treeManager->keyType = DT_INT; 
+
+
+  // Initialize Buffer Manager 
+  BM_BufferPool *bm = (BM_BufferPool *)malloc(sizeof(BM_BufferPool));
+  if (bm == NULL) 
+  {
+    free(treeManager);
+    return RC_ERROR;
+  }
+    treeManager->bufferPool = *bm;
+
+    return RC_OK;
+}
+
+
+
+extern RC shutdownIndexManager ()
+{
+  if (treeManager != NULL) 
+  {
+    // Free the Buffer Pool
+      shutdownBufferPool(&treeManager->bufferPool);
+      free(treeManager);
+      treeManager = NULL; 
+    }
+    
+  return RC_OK;
+}
+
+// create, destroy, open, and close an btree index
+extern RC createBtree (char *idxId, DataType keyType, int n)
+{
+  // Check if B+ Tree already exists
+    if (treeManager != NULL) {
+        return RC_ERROR; 
+    }
+
+    // Initialize B+ Tree 
+    treeManager = (IndexManager *)malloc(sizeof(IndexManager));
+    treeManager->order = n + 2;
+    treeManager->numNodes = 0;
+    treeManager->numEntries = 0;
+    treeManager->root = NULL;
+    treeManager->queue = NULL;
+    treeManager->keyType = keyType;
+
+    // Initialize Buffer Pool
+    BM_BufferPool *bm = (BM_BufferPool *)malloc(sizeof(BM_BufferPool));
+    treeManager->bufferPool = *bm;
+
+    // Initialize a new page file for the B+ Tree
+    if (createPageFile(idxId) != RC_OK) {
+        free(treeManager);
+        treeManager = NULL;
+        return RC_FILE_NOT_FOUND; 
+    }
+
+    // Open the page file
+    if (openPageFile(idxId, &treeManager->bufferPool.fh) != RC_OK) {
+        free(treeManager);
+        treeManager = NULL;
+        return RC_FILE_HANDLE_NOT_INIT; 
+    }
+
+    // Allocate a new page for the root of the B+ Tree
+    if (appendEmptyBlock(&treeManager->bufferPool.fh) != RC_OK) {
+        free(treeManager);
+        treeManager = NULL;
+        return RC_WRITE_FAILED; 
+    }
+
+    // Mark the new page as dirty
+    if (markDirty(&treeManager->bufferPool, &treeManager->bufferPool.pageHandle) != RC_OK) {
+        free(treeManager);
+        treeManager = NULL;
+        return RC_WRITE_FAILED; 
+    }
+
+    // Unpin the page
+    if (unpinPage(&treeManager->bufferPool, &treeManager->bufferPool.pageHandle) != RC_OK) {
+        free(treeManager);
+        treeManager = NULL;
+        return RC_WRITE_FAILED; 
+    }
+
+    // Close the page file
+    if (closePageFile(&treeManager->bufferPool.fh) != RC_OK) {
+        free(treeManager);
+        treeManager = NULL;
+        return RC_WRITE_FAILED; 
+    }
+
+    return RC_OK;
+
+}
+
+extern RC openBtree (BTreeHandle **tree, char *idxId)
+{
+    // Check if B+ Tree is already open
+    if (treeManager != NULL) {
+        return RC_ERROR; 
+    }
+
+    // Allocate memory for IndexHandle
+    *tree = (BTreeHandle *)malloc(sizeof(BTreeHandle));
+
+    // Allocate memory for IndexManager
+    treeManager = (IndexManager *)malloc(sizeof(IndexManager));
+    (*tree)->mgmtData = treeManager;
+
+    // Initialize Buffer Pool
+    BM_BufferPool *bm = (BM_BufferPool *)malloc(sizeof(BM_BufferPool));
+    treeManager->bufferPool = *bm;
+
+    // Initialize Buffer Pool using the existing page file
+    if (initBufferPool(&treeManager->bufferPool, idxId, 1000, RS_FIFO, NULL) != RC_OK) {
+        free(*tree);
+        free(treeManager);
+        *tree = NULL;
+        treeManager = NULL;
+        return RC_FILE_NOT_FOUND; 
+    }
+
+    return RC_OK;
+}
+
+extern RC closeBtree (BTreeHandle *tree)
+{
+  // Check if B+ Tree is not open
+  if (treeManager == NULL) {
+      return RC_ERROR;
+    }
+
+  IndexManager *treeManager = (IndexManager *)tree->mgmtData;
+
+  // Mark page as dirty 
+  markDirty(&treeManager->bufferPool, &treeManager->pageHandler);
+
+  // Shutdown the Buffer Pool
+  shutdownBufferPool(&treeManager->bufferPool);
+  free(treeManager);
+  free(tree);
+
+  treeManager = NULL;
+
+  return RC_OK;
+}
+
+extern RC deleteBtree (char *idxId)
+{
+  if (treeManager == NULL)
+  {
+      return RC_ERROR; 
+  }
+
+    // Destroy the page file 
+    RC code = destroyPageFile(idxId);
+
+    if (code != RC_OK) {
+        return code; 
+    }
+    
+    return RC_OK;
+}
+
+// Anwesha Nayak end

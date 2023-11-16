@@ -5,6 +5,33 @@
 #include "tables.h"
 #include "btree_implement.h"
 
+// Number of nodes present in the B+ Tree.
+RC getNumNodes(BTreeHandle *tree, int *result) {
+	// Fetches metadata of B+ Tree.
+	BTreeManager * treeManager = (BTreeManager *) tree->mgmtData;
+	// Save the count in result
+	*result = treeManager->numNodes;
+	return RC_OK;
+}
+
+// To get number of entries in the B+ Tree.
+RC getNumEntries(BTreeHandle *tree, int *result) {
+	// Fetches metadata of B+ Tree.
+	BTreeManager * treeManager = (BTreeManager *) tree->mgmtData;
+	// Save the numEntries found in metadata to result.
+	*result = treeManager->numEntries;
+	return RC_OK;
+}
+
+// Gives datatype of the keys in the B+ Tree.
+RC getKeyType(BTreeHandle *tree, DataType *result) {
+	// Fetches metadata of B+ Tree.
+	BTreeManager * treeManager = (BTreeManager *) tree->mgmtData;
+	// Result stores the datatype of the Key.
+	*result = treeManager->keyType;
+	return RC_OK;
+}
+
 // This function traverses the B+ Tree's entries and stores the record details (RID) in the memory location pointed to by the "result" parameter.
 RC nextEntry(BT_ScanHandle *handle, RID *result)
 {

@@ -43,8 +43,8 @@
       "type": "lldb",
       "request": "launch",
       "args": [],
-      "cwd": "/Users/jianqi/workspace/cs525forgroup/assign1/assign3",
-      "program": "/Users/jianqi/workspace/cs525forgroup/assign1/assign3/build/Debug/outDebug"
+      "cwd": "/Users/jianqi/workspace/cs525forgroup/assign1/assign4",
+      "program": "/Users/jianqi/workspace/cs525forgroup/assign1/assign4/build/Debug/outDebug"
     }
   ]
 }

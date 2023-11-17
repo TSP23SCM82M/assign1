@@ -71,8 +71,12 @@ testInsertAndFind (void)
   TEST_CHECK(openBtree(&tree, "testidx"));
 
   // insert keys
-  for(i = 0; i < numInserts; i++)
+  for(i = 0; i < numInserts; i++) {
+    if (i == 3) {
+      printf("debug");
+    };
     TEST_CHECK(insertKey(tree, keys[i], insert[i]));
+  }
 
   // check index stats
   TEST_CHECK(getNumNodes(tree, &testint));

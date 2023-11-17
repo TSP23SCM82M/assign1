@@ -8,7 +8,10 @@
     "dberror.h": "c",
     "__locale": "c",
     "string": "c",
-    "string_view": "c"
+    "string_view": "c",
+    "__node_handle": "c",
+    "__split_buffer": "c",
+    "unordered_map": "c"
   },
   "C_Cpp_Runner.cCompilerPath": "clang",
   "C_Cpp_Runner.cppCompilerPath": "clang++",

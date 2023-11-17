@@ -39,6 +39,14 @@
       "program": "/Users/jianqi/workspace/cs525forgroup/assign1/assign3/output/test3.o"
     },
     {
+      "name": "Assign4 Debug",
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "/Users/jianqi/workspace/cs525forgroup/assign1/assign4",
+      "program": "/Users/jianqi/workspace/cs525forgroup/assign1/assign4/output/test4.o"
+    },
+    {
       "name": "C/C++ Runner: Debug Session",
       "type": "lldb",
       "request": "launch",

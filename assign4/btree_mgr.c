@@ -3,12 +3,267 @@
 #include "storage_mgr.h"
 #include "buffer_mgr.h"
 #include "tables.h"
+#include <stdlib.h>
 #include "btree_implement.h"
 
+// Anwesha Nayak start
+
+// Global variable to store the index manager data
+IndexManager *treeManager = NULL;
+
+RC initIndexManager(void *mgmtData) {
+	initStorageManager();
+	return RC_OK;
+}
+
+// extern RC initIndexManager_origin (void *mgmtData)
+// {
+//   initStorageManager();
+    
+//   // Allocate memory for IndexManager
+//   treeManager = (IndexManager *)malloc(sizeof(IndexManager));
+//   if (treeManager == NULL) 
+//   {
+//       return RC_ERROR;
+//   }
+
+//   // Initialize IndexManager
+//     treeManager->order = 0;
+//     treeManager->numNodes = 0;
+//     treeManager->numEntries = 0;
+//     treeManager->root = NULL;
+//     treeManager->queue = NULL;
+//     treeManager->keyType = DT_INT; 
+
+
+//   // Initialize Buffer Manager 
+//   BM_BufferPool *bm = (BM_BufferPool *)malloc(sizeof(BM_BufferPool));
+//   if (bm == NULL) 
+//   {
+//     free(treeManager);
+//     return RC_ERROR;
+//   }
+//     treeManager->bufferPool = *bm;
+
+//     return RC_OK;
+// }
+
+
+
+extern RC shutdownIndexManager ()
+{
+  if (treeManager != NULL) 
+  {
+    // Free the Buffer Pool
+      // shutdownBufferPool(&treeManager->bufferPool);
+      // free(treeManager);
+    treeManager = NULL; 
+  }
+    
+  return RC_OK;
+}
+
+// create, destroy, open, and close an btree index
+// extern RC createBtree_origin (char *idxId, DataType keyType, int n)
+// {
+//   // Check if B+ Tree already exists
+//     if (treeManager != NULL) {
+//         return RC_ERROR; 
+//     }
+
+//     // Initialize B+ Tree 
+//     treeManager = (IndexManager *)malloc(sizeof(IndexManager));
+//     treeManager->order = n + 2;
+//     treeManager->numNodes = 0;
+//     treeManager->numEntries = 0;
+//     treeManager->root = NULL;
+//     treeManager->queue = NULL;
+//     treeManager->keyType = keyType;
+
+//     // Initialize Buffer Pool
+//     BM_BufferPool *bm = (BM_BufferPool *)malloc(sizeof(BM_BufferPool));
+//     treeManager->bufferPool = *bm;
+//     SM_FileHandle fh;
+//     // Initialize a new page file for the B+ Tree
+//     if (createPageFile(idxId) != RC_OK) {
+//         free(treeManager);
+//         treeManager = NULL;
+//         return RC_FILE_NOT_FOUND; 
+//     }
+
+//     // Open the page file
+//     if (openPageFile(idxId, &fh) != RC_OK) {
+//         free(treeManager);
+//         treeManager = NULL;
+//         return RC_FILE_HANDLE_NOT_INIT; 
+//     }
+
+//     // Allocate a new page for the root of the B+ Tree
+//     if (appendEmptyBlock(&fh) != RC_OK) {
+//         free(treeManager);
+//         treeManager = NULL;
+//         return RC_WRITE_FAILED; 
+//     }
+
+//     // Mark the new page as dirty
+//     if (markDirty(&treeManager->bufferPool, &treeManager->bufferPool.pageHandle) != RC_OK) {
+//         free(treeManager);
+//         treeManager = NULL;
+//         return RC_WRITE_FAILED; 
+//     }
+
+//     // Unpin the page
+//     if (unpinPage(&treeManager->bufferPool, &treeManager->bufferPool.pageHandle) != RC_OK) {
+//         free(treeManager);
+//         treeManager = NULL;
+//         return RC_WRITE_FAILED; 
+//     }
+
+//     // Close the page file
+//     if (closePageFile(&treeManager->bufferPool.fh) != RC_OK) {
+//         free(treeManager);
+//         treeManager = NULL;
+//         return RC_WRITE_FAILED; 
+//     }
+
+//     return RC_OK;
+
+// }
+RC createBtree(char *idxId, DataType keyType, int n) {
+	int maxNodes = PAGE_SIZE / sizeof(Node);
+
+	// Return error if we cannot accommodate a B++ Tree of that order.
+	if (n > maxNodes) {
+		printf("\n n = %d > Max. Nodes = %d \n", n, maxNodes);
+		return RC_ORDER_TOO_HIGH_FOR_PAGE;
+	}
+
+	// Initialize the members of our B+ Tree metadata structure.
+	treeManager = (IndexManager *) malloc(sizeof(IndexManager));
+	treeManager->order = n + 2;		// Setting order of B+ Tree
+	treeManager->numNodes = 0;		// No nodes initially.
+	treeManager->numEntries = 0;	// No entries initially
+	treeManager->root = NULL;		// No root node
+	treeManager->queue = NULL;		// No node for printing
+	treeManager->keyType = keyType;	// Set datatype to "keyType"
+
+	// Initialize Buffer Manager and store in our structure.
+	BM_BufferPool * bm = (BM_BufferPool *) malloc(sizeof(BM_BufferPool));
+	treeManager->bufferPool = *bm;
+
+	SM_FileHandle fileHandler;
+	RC result;
+
+	char data[PAGE_SIZE];
+
+	// Create page file. Return error code if error occurs.
+	if ((result = createPageFile(idxId)) != RC_OK)
+		return result;
+
+	// Open page file.  Return error code if error occurs.
+	if ((result = openPageFile(idxId, &fileHandler)) != RC_OK)
+		return result;
+
+	// Write empty content to page.  Return error code if error occurs.
+	if ((result = writeBlock(0, &fileHandler, data)) != RC_OK)
+		return result;
+
+	// Close page file.  Return error code if error occurs.
+	if ((result = closePageFile(&fileHandler)) != RC_OK)
+		return result;
+
+	//printf("\n createBtree SUCCESS");
+	return (RC_OK);
+}
+// extern RC openBtree_origin (BTreeHandle **tree, char *idxId)
+// {
+//     // Check if B+ Tree is already open
+//     if (treeManager != NULL) {
+//         return RC_ERROR; 
+//     }
+
+//     // Allocate memory for IndexHandle
+//     *tree = (BTreeHandle *)malloc(sizeof(BTreeHandle));
+
+//     // Allocate memory for IndexManager
+//     treeManager = (IndexManager *)malloc(sizeof(IndexManager));
+//     (*tree)->mgmtData = treeManager;
+
+//     // Initialize Buffer Pool
+//     BM_BufferPool *bm = (BM_BufferPool *)malloc(sizeof(BM_BufferPool));
+//     treeManager->bufferPool = *bm;
+
+//     // Initialize Buffer Pool using the existing page file
+//     if (initBufferPool(&treeManager->bufferPool, idxId, 1000, RS_FIFO, NULL) != RC_OK) {
+//         free(*tree);
+//         free(treeManager);
+//         *tree = NULL;
+//         treeManager = NULL;
+//         return RC_FILE_NOT_FOUND; 
+//     }
+
+//     return RC_OK;
+// }
+// This functions opens an existing B+ Tree from the specified page "idxId"
+RC openBtree(BTreeHandle **tree, char *idxId) {
+	// Retrieve B+ Tree handle and assign our metadata structure
+	*tree = (BTreeHandle *) malloc(sizeof(BTreeHandle));
+	(*tree)->mgmtData = treeManager;
+
+	// Initialize a Buffer Pool using Buffer Manager
+	RC result = initBufferPool(&treeManager->bufferPool, idxId, 1000, RS_FIFO, NULL);
+
+	if (result == RC_OK) {
+		//printf("\n openBtree SUCCESS");
+		return RC_OK;
+	}
+	return result;
+}
+
+extern RC closeBtree (BTreeHandle *tree)
+{
+  IndexManager *treeManager = (IndexManager *)tree->mgmtData;
+
+  // Check if B+ Tree is not open
+  if (treeManager == NULL) {
+    return RC_ERROR;
+  }
+
+  // Mark page as dirty 
+  markDirty(&treeManager->bufferPool, &treeManager->pageHandler);
+
+  // Shutdown the Buffer Pool
+  shutdownBufferPool(&treeManager->bufferPool);
+  free(treeManager);
+  free(tree);
+
+  treeManager = NULL;
+
+  return RC_OK;
+}
+
+extern RC deleteBtree (char *idxId)
+{
+  if (treeManager == NULL)
+  {
+      return RC_ERROR; 
+  }
+
+    // Destroy the page file 
+    RC code = destroyPageFile(idxId);
+
+    if (code != RC_OK) {
+        return code; 
+    }
+    
+    return RC_OK;
+}
+
+// Anwesha Nayak end
 // Number of nodes present in the B+ Tree.
 RC getNumNodes(BTreeHandle *tree, int *result) {
 	// Fetches metadata of B+ Tree.
-	BTreeManager * treeManager = (BTreeManager *) tree->mgmtData;
+	IndexManager * treeManager = (IndexManager *) tree->mgmtData;
 	// Save the count in result
 	*result = treeManager->numNodes;
 	return RC_OK;
@@ -17,7 +272,7 @@ RC getNumNodes(BTreeHandle *tree, int *result) {
 // To get number of entries in the B+ Tree.
 RC getNumEntries(BTreeHandle *tree, int *result) {
 	// Fetches metadata of B+ Tree.
-	BTreeManager * treeManager = (BTreeManager *) tree->mgmtData;
+	IndexManager * treeManager = (IndexManager *) tree->mgmtData;
 	// Save the numEntries found in metadata to result.
 	*result = treeManager->numEntries;
 	return RC_OK;
@@ -26,9 +281,288 @@ RC getNumEntries(BTreeHandle *tree, int *result) {
 // Gives datatype of the keys in the B+ Tree.
 RC getKeyType(BTreeHandle *tree, DataType *result) {
 	// Fetches metadata of B+ Tree.
-	BTreeManager * treeManager = (BTreeManager *) tree->mgmtData;
+	IndexManager * treeManager = (IndexManager *) tree->mgmtData;
 	// Result stores the datatype of the Key.
 	*result = treeManager->keyType;
+	return RC_OK;
+}
+
+// zoraiz
+extern RC findKey(BTreeHandle *tree, Value *key, RID *result) {
+	
+	// Check if the tree and its manager are valid
+    if (tree == NULL || tree->mgmtData == NULL) {
+        return RC_ERROR;
+    }
+
+    IndexManager *treeManager = (IndexManager *)tree->mgmtData;
+
+    // Find the record with the given key
+    NodeData *record = findRecord(treeManager->root, key);
+
+    // Check if the record was not found
+    if (record == NULL) {
+        return RC_IM_KEY_NOT_FOUND;
+    }
+
+    // Copy the RID to the result
+    *result = record->rid;
+
+    return RC_OK;
+
+}
+
+// This function adds a new entry/record with the specified key and RID.
+RC insertKey(BTreeHandle *tree, Value *key, RID rid) {
+	// Retrieve B+ Tree's metadata information.
+	IndexManager *treeManager = (IndexManager *) tree->mgmtData;
+	NodeData * pointer;
+	Node * leaf;
+
+	int bTreeOrder = treeManager->order;
+
+	//printf("\n INSERTING KEY = %d and rid = %d", key->v.intV, rid.page);
+	//printf("\n INSERTING page = %d and slot = %d", rid.page, rid.slot);
+
+	// Check is a record with the spcified key already exists.
+	if (findRecord(treeManager->root, key) != NULL) {
+		printf("\n insertKey :: KEY EXISTS");
+		return RC_IM_KEY_ALREADY_EXISTS;
+	}
+
+	// Create a new record (NodeData) for the value RID.
+	pointer = makeRecord(&rid);
+
+	// If the tree doesn't exist yet, create a new tree.
+	if (treeManager->root == NULL) {
+		treeManager->root = createNewTree(treeManager, key, pointer);
+		//printf("\n insertKey :: First Node created");
+		//printTree(tree);
+		return RC_OK;
+	}
+
+	// If the tree already exists, then find a leaf where the key can be inserted.
+	leaf = findLeaf(treeManager->root, key);
+
+	if (leaf->num_keys < bTreeOrder - 1) {
+		// If the leaf has room for the new key, then insert the new key into that leaf.
+		leaf = insertIntoLeaf(treeManager, leaf, key, pointer);
+	} else {
+		// If the leaf dows not have room for the new key, split leaf and then insert the new key into that leaf.
+		treeManager->root = insertIntoLeafAfterSplitting(treeManager, leaf, key, pointer);
+	}
+
+	// Print the B+ Tree for debugging purpose.
+	//printf("\n");
+	//printTree(tree);
+	return RC_OK;
+}
+
+// RC insertKey_origin(BTreeHandle *tree, Value *key, RID rid) {
+	
+// 	// Check if the tree and its manager are valid
+//     if (tree == NULL || tree->mgmtData == NULL) {
+//         return RC_ERROR;
+//     }
+
+//     IndexManager *treeManager = (IndexManager *)tree->mgmtData;
+
+//     // Ensure key does not already exist
+//     if (findRecord(treeManager->root, key) != NULL) {
+//         printf("\n insertKey :: KEY EXISTS");
+//         return RC_IM_KEY_ALREADY_EXISTS;
+//     }
+
+//     NodeData *pointer = makeRecord(&rid);
+//     Node *leaf;
+
+//     int bTreeOrder = treeManager->order;
+
+//     // If the tree is empty, create a new tree
+//     if (treeManager->root == NULL) {
+//         treeManager->root = createNewTree(treeManager, key, pointer);
+//         return RC_OK;
+//     }
+
+//     // Find the leaf to insert into
+//     leaf = findLeaf(treeManager->root, key);
+
+//     // Check if there's enough space in the leaf
+//     if (leaf->num_keys < bTreeOrder - 1) {
+//         leaf = insertIntoLeaf(treeManager, leaf, key, pointer);
+//     } else {
+//         if (treeManager == NULL || leaf == NULL) {
+//             return RC_ERROR;
+//         }
+
+//         // Split the leaf and update the root
+//         Node *newRoot = insertIntoLeafAfterSplitting(treeManager, leaf, key, pointer);
+
+//         // Check if the split was successful
+//         if (newRoot == NULL) {
+//             return RC_ERROR; // or another appropriate error code
+//         }
+
+//         treeManager->root = newRoot;
+
+//         return RC_OK;
+//     }
+
+//     return RC_OK;
+
+// }
+// This function deletes the entry/record with the specified "key" in the B+ Tree.
+RC deleteKey(BTreeHandle *tree, Value *key) {
+	// Retrieve B+ Tree's metadata information.
+	IndexManager *treeManager = (IndexManager *) tree->mgmtData;
+
+	// Deleting the entry with the specified key.
+	treeManager->root = delete(treeManager, key);
+	//printTree(tree);
+	return RC_OK;
+}
+
+// RC deleteKey_origin(BTreeHandle *tree, Value *key) {
+	
+// 	if (tree == NULL || tree->mgmtData == NULL) {
+//     return RC_ERROR;
+// 	}
+
+// 	IndexManager *treeManager = (IndexManager *)tree->mgmtData;
+
+// 	// Ensure treeManager has a valid root
+// 	if (treeManager->root == NULL) {
+// 		return RC_ERROR;
+// 	}
+
+// 	// Attempt to delete the key from the B-tree
+// 	treeManager->root = deleteKey(treeManager, key);
+
+// 	// Check if the deletion was successful
+// 	if (treeManager->root == NULL) {
+// 		return RC_IM_NO_MORE_ENTRIES; // or another appropriate error code
+// 	}
+
+// 	return RC_OK;
+
+// }
+
+// // function for next entry
+// RC nextEntry (BT_ScanHandle *handle, RID *result)
+// {
+
+//   ScanManager * scanmeta = (ScanManager *) handle->mgmtData;
+
+	
+// 	int keyIndex = scanmeta->keyIndex;
+// 	int totalKeys = scanmeta->totalKeys;
+// 	int bTreeOrder = scanmeta->order;
+// 	RID rid;
+
+	
+// 	Node * node = scanmeta->node;
+
+	
+// 	if (node == NULL) {
+// 		return RC_IM_NO_MORE_ENTRIES;
+// 	}
+
+// 	if (keyIndex < totalKeys) {
+		
+// 		rid = ((NodeData *) node->pointers[keyIndex])->rid;
+		
+		
+// 		scanmeta->keyIndex++;
+// 	} else {
+		
+// 		if (node->pointers[bTreeOrder - 1] != NULL) {
+// 			node = node->pointers[bTreeOrder - 1];
+// 			scanmeta->keyIndex = 1;
+// 			scanmeta->totalKeys = node->num_keys;
+// 			scanmeta->node = node;
+// 			rid = ((NodeData *) node->pointers[0])->rid;
+			
+// 		} else {
+			
+// 			return RC_IM_NO_MORE_ENTRIES;
+// 		}
+// 	}
+	
+// 	*result = rid;
+// 	return RC_OK;
+
+// }
+
+// // function to close tree scan
+// RC closeTreeScan (BT_ScanHandle *handle)
+// {
+//     if (handle == NULL) {
+//         return RC_SCAN_CONDITION_NOT_FOUND;
+//     }
+
+//     // Additional cleanup or resource release if needed
+
+//     free(handle);
+//     handle = NULL;
+
+//     return RC_OK;
+// }
+
+// //function to print tree
+// char *printTree (BTreeHandle *tree)
+// {
+//     if (tree == NULL) {
+//         // Handle the case where the tree handle is not initialized
+//         return "Error: B-tree handle is not initialized.";
+//     }
+
+//     // Implement tree printing logic here
+
+//     // Example: Print the number of nodes in the tree
+//     int numNodes;
+//     RC result = getNumNodes(tree, &numNodes);
+//     if (result != RC_OK) {
+//         // Handle the error, e.g., log it or return an error message
+//         return "Error: Unable to retrieve the number of nodes.";
+//     }
+
+//     // Placeholder for actual tree printing logic
+//     char *treePrintOutput = malloc(100); // Adjust size accordingly
+//     snprintf(treePrintOutput, 100, "Number of nodes in the tree: %d", numNodes);
+
+//     return treePrintOutput;
+// }
+// zoraiz
+
+// This function initializes the scan which is used to scan the entries in the B+ Tree.
+RC openTreeScan(BTreeHandle *tree, BT_ScanHandle **handle) {
+	// Retrieve B+ Tree's metadata information.
+	IndexManager *treeManager = (IndexManager *) tree->mgmtData;
+
+	// Retrieve B+ Tree Scan's metadata information.
+	ScanManager *scanmeta = malloc(sizeof(ScanManager));
+
+	// Allocating some memory space.
+	*handle = malloc(sizeof(BT_ScanHandle));
+
+	Node * node = treeManager->root;
+
+	if (treeManager->root == NULL) {
+		//printf("Empty tree.\n");
+		return RC_NO_RECORDS_TO_SCAN;
+	} else {
+		//printf("\n openTreeScan() ......... Inside ELse  ");
+		while (!node->is_leaf)
+			node = node->pointers[0];
+
+		// Initializing (setting) the Scan's metadata information.
+		scanmeta->keyIndex = 0;
+		scanmeta->totalKeys = node->num_keys;
+		scanmeta->node = node;
+		scanmeta->order = treeManager->order;
+		(*handle)->mgmtData = scanmeta;
+		//printf("\n keyIndex = %d, totalKeys = %d ", scanmeta->keyIndex, scanmeta->totalKeys);
+	}
 	return RC_OK;
 }
 
@@ -69,7 +603,7 @@ RC nextEntry(BT_ScanHandle *handle, RID *result)
     }
     rid = ((NodeData *)node->pointers[keyIndex])->rid;
     // Move to the next key index.
-    if (scanmeta->keyIndex == NULL)
+    if (scanmeta->keyIndex == -1)
     {
       return RC_ERROR;
     }
@@ -105,7 +639,7 @@ RC nextEntry(BT_ScanHandle *handle, RID *result)
       // Get the RID from the first entry in the new node.
       rid = ((NodeData *)node->pointers[0])->rid;
       // -1 means invalid
-      if (rid == -1)
+      if (&rid == NULL)
       {
         return RC_ERROR;
       }
@@ -144,7 +678,7 @@ extern RC closeTreeScan(BT_ScanHandle *handle)
 extern char *printTree(BTreeHandle *tree)
 {
   // Get the tree manager from the BTree handle.
-  BTreeManager *treeManager = (BTreeManager *)tree->mgmtData;
+  IndexManager *treeManager = (IndexManager *)tree->mgmtData;
   if (treeManager == NULL || tree == NULL)
   {
     printf("ERROR");
@@ -166,7 +700,7 @@ extern char *printTree(BTreeHandle *tree)
   treeManager->queue = NULL;
   if (enqueue(treeManager, treeManager->root) == -1)
   {
-    print("enqueue failed");
+    printf("enqueue failed");
     return '\0';
   }
   // Perform level order traversal using the queue.
@@ -239,384 +773,3 @@ extern char *printTree(BTreeHandle *tree)
   // Return an 'empty string' as the function's required return type is char*.
   return '\0';
 }
-
-// Anwesha Nayak start
-
-// Global variable to store the index manager data
-IndexManager *treeManager = NULL;
-
-extern RC initIndexManager (void *mgmtData)
-{
-  initStorageManager();
-    
-  // Allocate memory for IndexManager
-  treeManager = (IndexManager *)malloc(sizeof(IndexManager));
-  if (treeManager == NULL) 
-  {
-      return RC_ERROR;
-  }
-
-  // Initialize IndexManager
-    treeManager->order = 0;
-    treeManager->numNodes = 0;
-    treeManager->numEntries = 0;
-    treeManager->root = NULL;
-    treeManager->queue = NULL;
-    treeManager->keyType = DT_INT; 
-
-
-  // Initialize Buffer Manager 
-  BM_BufferPool *bm = (BM_BufferPool *)malloc(sizeof(BM_BufferPool));
-  if (bm == NULL) 
-  {
-    free(treeManager);
-    return RC_ERROR;
-  }
-    treeManager->bufferPool = *bm;
-
-    return RC_OK;
-}
-
-
-
-extern RC shutdownIndexManager ()
-{
-  if (treeManager != NULL) 
-  {
-    // Free the Buffer Pool
-      shutdownBufferPool(&treeManager->bufferPool);
-      free(treeManager);
-      treeManager = NULL; 
-    }
-    
-  return RC_OK;
-}
-
-// create, destroy, open, and close an btree index
-extern RC createBtree (char *idxId, DataType keyType, int n)
-{
-  // Check if B+ Tree already exists
-    if (treeManager != NULL) {
-        return RC_ERROR; 
-    }
-
-    // Initialize B+ Tree 
-    treeManager = (IndexManager *)malloc(sizeof(IndexManager));
-    treeManager->order = n + 2;
-    treeManager->numNodes = 0;
-    treeManager->numEntries = 0;
-    treeManager->root = NULL;
-    treeManager->queue = NULL;
-    treeManager->keyType = keyType;
-
-    // Initialize Buffer Pool
-    BM_BufferPool *bm = (BM_BufferPool *)malloc(sizeof(BM_BufferPool));
-    treeManager->bufferPool = *bm;
-
-    // Initialize a new page file for the B+ Tree
-    if (createPageFile(idxId) != RC_OK) {
-        free(treeManager);
-        treeManager = NULL;
-        return RC_FILE_NOT_FOUND; 
-    }
-
-    // Open the page file
-    if (openPageFile(idxId, &treeManager->bufferPool.fh) != RC_OK) {
-        free(treeManager);
-        treeManager = NULL;
-        return RC_FILE_HANDLE_NOT_INIT; 
-    }
-
-    // Allocate a new page for the root of the B+ Tree
-    if (appendEmptyBlock(&treeManager->bufferPool.fh) != RC_OK) {
-        free(treeManager);
-        treeManager = NULL;
-        return RC_WRITE_FAILED; 
-    }
-
-    // Mark the new page as dirty
-    if (markDirty(&treeManager->bufferPool, &treeManager->bufferPool.pageHandle) != RC_OK) {
-        free(treeManager);
-        treeManager = NULL;
-        return RC_WRITE_FAILED; 
-    }
-
-    // Unpin the page
-    if (unpinPage(&treeManager->bufferPool, &treeManager->bufferPool.pageHandle) != RC_OK) {
-        free(treeManager);
-        treeManager = NULL;
-        return RC_WRITE_FAILED; 
-    }
-
-    // Close the page file
-    if (closePageFile(&treeManager->bufferPool.fh) != RC_OK) {
-        free(treeManager);
-        treeManager = NULL;
-        return RC_WRITE_FAILED; 
-    }
-
-    return RC_OK;
-
-}
-
-extern RC openBtree (BTreeHandle **tree, char *idxId)
-{
-    // Check if B+ Tree is already open
-    if (treeManager != NULL) {
-        return RC_ERROR; 
-    }
-
-    // Allocate memory for IndexHandle
-    *tree = (BTreeHandle *)malloc(sizeof(BTreeHandle));
-
-    // Allocate memory for IndexManager
-    treeManager = (IndexManager *)malloc(sizeof(IndexManager));
-    (*tree)->mgmtData = treeManager;
-
-    // Initialize Buffer Pool
-    BM_BufferPool *bm = (BM_BufferPool *)malloc(sizeof(BM_BufferPool));
-    treeManager->bufferPool = *bm;
-
-    // Initialize Buffer Pool using the existing page file
-    if (initBufferPool(&treeManager->bufferPool, idxId, 1000, RS_FIFO, NULL) != RC_OK) {
-        free(*tree);
-        free(treeManager);
-        *tree = NULL;
-        treeManager = NULL;
-        return RC_FILE_NOT_FOUND; 
-    }
-
-    return RC_OK;
-}
-
-extern RC closeBtree (BTreeHandle *tree)
-{
-  // Check if B+ Tree is not open
-  if (treeManager == NULL) {
-      return RC_ERROR;
-    }
-
-  IndexManager *treeManager = (IndexManager *)tree->mgmtData;
-
-  // Mark page as dirty 
-  markDirty(&treeManager->bufferPool, &treeManager->pageHandler);
-
-  // Shutdown the Buffer Pool
-  shutdownBufferPool(&treeManager->bufferPool);
-  free(treeManager);
-  free(tree);
-
-  treeManager = NULL;
-
-  return RC_OK;
-}
-
-extern RC deleteBtree (char *idxId)
-{
-  if (treeManager == NULL)
-  {
-      return RC_ERROR; 
-  }
-
-    // Destroy the page file 
-    RC code = destroyPageFile(idxId);
-
-    if (code != RC_OK) {
-        return code; 
-    }
-    
-    return RC_OK;
-}
-
-// Anwesha Nayak end
-
-// zoraiz
-extern RC findKey(BTreeHandle *tree, Value *key, RID *result) {
-	
-	// Check if the tree and its manager are valid
-    if (tree == NULL || tree->mgmtData == NULL) {
-        return RC_INVALID_TREE_HANDLE;
-    }
-
-    BTreeManager *treeManager = (BTreeManager *)tree->mgmtData;
-
-    // Find the record with the given key
-    NodeData *record = findRecord(treeManager->root, key);
-
-    // Check if the record was not found
-    if (record == NULL) {
-        return RC_IM_KEY_NOT_FOUND;
-    }
-
-    // Copy the RID to the result
-    *result = record->rid;
-
-    return RC_OK;
-
-}
-
-RC insertKey(BTreeHandle *tree, Value *key, RID rid) {
-	
-	// Check if the tree and its manager are valid
-    if (tree == NULL || tree->mgmtData == NULL) {
-        return RC_ERROR;
-    }
-
-    BTreeManager *treeManager = (BTreeManager *)tree->mgmtData;
-
-    // Ensure key does not already exist
-    if (findRecord(treeManager->root, key) != NULL) {
-        printf("\n insertKey :: KEY EXISTS");
-        return RC_IM_KEY_ALREADY_EXISTS;
-    }
-
-    NodeData *pointer = makeRecord(&rid);
-    Node *leaf;
-
-    int bTreeOrder = treeManager->order;
-
-    // If the tree is empty, create a new tree
-    if (treeManager->root == NULL) {
-        treeManager->root = createNewTree(treeManager, key, pointer);
-        return RC_OK;
-    }
-
-    // Find the leaf to insert into
-    leaf = findLeaf(treeManager->root, key);
-
-    // Check if there's enough space in the leaf
-    if (leaf->num_keys < bTreeOrder - 1) {
-        leaf = insertIntoLeaf(treeManager, leaf, key, pointer);
-    } else {
-        if (treeManager == NULL || leaf == NULL) {
-            return RC_ERROR;
-        }
-
-        // Split the leaf and update the root
-        Node *newRoot = insertIntoLeafAfterSplitting(treeManager, leaf, key, pointer);
-
-        // Check if the split was successful
-        if (newRoot == NULL) {
-            return RC_ERROR; // or another appropriate error code
-        }
-
-        treeManager->root = newRoot;
-
-        return RC_OK;
-    }
-
-    return RC_OK;
-
-}
-
-RC deleteKey(BTreeHandle *tree, Value *key) {
-	
-	if (tree == NULL || tree->mgmtData == NULL) {
-    return RC_ERROR;
-	}
-
-	BTreeManager *treeManager = (BTreeManager *)tree->mgmtData;
-
-	// Ensure treeManager has a valid root
-	if (treeManager->root == NULL) {
-		return RC_ERROR;
-	}
-
-	// Attempt to delete the key from the B-tree
-	treeManager->root = deleteKey(treeManager, key);
-
-	// Check if the deletion was successful
-	if (treeManager->root == NULL) {
-		return RC_IM_NO_MORE_ENTRIES; // or another appropriate error code
-	}
-
-	return RC_OK;
-
-}
-
-// function for next entry
-RC nextEntry (BT_ScanHandle *handle, RID *result)
-{
-
-  ScanManager * scanmeta = (ScanManager *) handle->mgmtData;
-
-	
-	int keyIndex = scanmeta->keyIndex;
-	int totalKeys = scanmeta->totalKeys;
-	int bTreeOrder = scanmeta->order;
-	RID rid;
-
-	
-	Node * node = scanmeta->node;
-
-	
-	if (node == NULL) {
-		return RC_IM_NO_MORE_ENTRIES;
-	}
-
-	if (keyIndex < totalKeys) {
-		
-		rid = ((NodeData *) node->pointers[keyIndex])->rid;
-		
-		
-		scanmeta->keyIndex++;
-	} else {
-		
-		if (node->pointers[bTreeOrder - 1] != NULL) {
-			node = node->pointers[bTreeOrder - 1];
-			scanmeta->keyIndex = 1;
-			scanmeta->totalKeys = node->num_keys;
-			scanmeta->node = node;
-			rid = ((NodeData *) node->pointers[0])->rid;
-			
-		} else {
-			
-			return RC_IM_NO_MORE_ENTRIES;
-		}
-	}
-	
-	*result = rid;
-	return RC_OK;
-
-}
-
-// function to close tree scan
-RC closeTreeScan (BT_ScanHandle *handle)
-{
-    if (handle == NULL) {
-        return RC_SCAN_CONDITION_NOT_FOUND;
-    }
-
-    // Additional cleanup or resource release if needed
-
-    free(handle);
-    handle = NULL;
-
-    return RC_OK;
-}
-
-//function to print tree
-char *printTree (BTreeHandle *tree)
-{
-    if (tree == NULL) {
-        // Handle the case where the tree handle is not initialized
-        return "Error: B-tree handle is not initialized.";
-    }
-
-    // Implement tree printing logic here
-
-    // Example: Print the number of nodes in the tree
-    int numNodes;
-    RC result = getNumNodes(tree, &numNodes);
-    if (result != RC_OK) {
-        // Handle the error, e.g., log it or return an error message
-        return "Error: Unable to retrieve the number of nodes.";
-    }
-
-    // Placeholder for actual tree printing logic
-    char *treePrintOutput = malloc(100); // Adjust size accordingly
-    snprintf(treePrintOutput, 100, "Number of nodes in the tree: %d", numNodes);
-
-    return treePrintOutput;
-}
-// zoraiz

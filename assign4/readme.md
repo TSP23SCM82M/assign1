@@ -61,7 +61,7 @@ insertIntoNewRoot(...):
 getLeftIndex(...): 
 --> Finds the index of the parent's pointer to the left of the key to be inserted.
 
-adjustRoot(...): 
+adjustNode(...): 
 --> Adjusts the root after a record deletion.
 
 mergeNodes(...): 
@@ -76,7 +76,7 @@ deleteEntry(...):
 delete(...): 
 --> Deletes the entry with the specified key.
 
-removeEntryFromNode(...): 
+deleteNodeEntry(...): 
 --> Removes a record with the specified key from a node.
 
 getNeighborIndex(...): 

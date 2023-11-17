@@ -58,7 +58,7 @@ Node *insertIntoLeaf(IndexManager *treeManager, Node *leaf, Value *key, NodeData
 Node *createNewTree(IndexManager *treeManager, Value *key, NodeData *pointer);
 Node *createNode(IndexManager *treeManager);
 Node *createLeaf(IndexManager *treeManager);
-Node *insertIntoLeafAfterSplitting(IndexManager *treeManager, Node *leaf, Value *key, NodeData *pointer);
+Node *insertLeafSplitting(IndexManager *treeManager, Node *leaf, Value *key, NodeData *pointer);
 Node *insertIntoNode(IndexManager *treeManager, Node *parent, int left_index, Value *key, Node *right);
 Node *insertIntoNodeAfterSplitting(IndexManager *treeManager, Node *parent, int left_index, Value *key, Node *right);
 Node *insertIntoParent(IndexManager *treeManager, Node *left, Value *key, Node *right);
@@ -66,12 +66,12 @@ Node *insertIntoNewRoot(IndexManager *treeManager, Node *left, Value *key, Node 
 int getLeftIndex(Node *parent, Node *left);
 
 // Functions to support deleting of an element (record) in the B+ Tree
-Node *adjustRoot(Node *root);
+Node *adjustNode(Node *root);
 Node *mergeNodes(IndexManager *treeManager, Node *n, Node *neighbor, int neighbor_index, int *k_prime);
 Node *redistributeNodes(Node *root, Node *n, Node *neighbor, int neighbor_index, int k_prime_index, int k_prime);
 Node *deleteEntry(IndexManager *treeManager, Node *n, Value *key, void *pointer);
 Node *delete(IndexManager *treeManager, Value *key);
-Node *removeEntryFromNode(IndexManager *treeManager, Node *n, Value *key, Node *pointer);
+Node *deleteNodeEntry(IndexManager *treeManager, Node *n, Value *key, Node *pointer);
 int getNeighborIndex(Node *n);
 
 // Functions to support KEYS of multiple datatypes.

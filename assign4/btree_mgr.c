@@ -315,46 +315,78 @@ extern RC findKey(BTreeHandle *tree, Value *key, RID *result) {
 // This function adds a new entry/record with the specified key and RID.
 RC insertKey(BTreeHandle *tree, Value *key, RID rid) {
 	// Retrieve B+ Tree's metadata information.
-	IndexManager *treeManager = (IndexManager *) tree->mgmtData;
-	NodeData * pointer;
-	Node * leaf;
+  IndexManager *treeManager = (IndexManager *)tree->mgmtData;
 
-	int bTreeOrder = treeManager->order;
+  // Check for NULL treeManager
+  if (treeManager == NULL) {
+      fprintf(stderr, "Invalid tree manager\n");
+      return RC_ERROR;
+  }
 
-	//printf("\n INSERTING KEY = %d and rid = %d", key->v.intV, rid.page);
-	//printf("\n INSERTING page = %d and slot = %d", rid.page, rid.slot);
+  // Check if order is not specified
+  if (treeManager->order <= 0) {
+      fprintf(stderr, "Invalid B+ tree order\n");
+      return RC_ERROR;
+  }
 
-	// Check is a record with the spcified key already exists.
-	if (findRecord(treeManager->root, key) != NULL) {
-		printf("\n insertKey :: KEY EXISTS");
-		return RC_IM_KEY_ALREADY_EXISTS;
-	}
+  // Use the specified order
+  int bTreeOrder = treeManager->order;
+
+  // Accessing pointer and leaf variables.
+  NodeData *pointer;
+  Node *leaf;
+
+  // Check if a record with the specified key already exists.
+  if (findRecord(treeManager->root, key) != NULL) {
+      fprintf(stderr, "insertKey :: Key already exists\n");
+      // Handle the error appropriately, e.g., return an error code or perform other actions.
+      return RC_IM_KEY_ALREADY_EXISTS;
+  }
 
 	// Create a new record (NodeData) for the value RID.
 	pointer = makeRecord(&rid);
+  if (pointer == NULL) {
+      fprintf(stderr, "Error creating record\n");
+      // Handle the error appropriately, e.g., return an error code or perform other actions.
+      return RC_ERROR;
+  }
 
 	// If the tree doesn't exist yet, create a new tree.
 	if (treeManager->root == NULL) {
-		treeManager->root = createNewTree(treeManager, key, pointer);
-		//printf("\n insertKey :: First Node created");
-		//printTree(tree);
-		return RC_OK;
-	}
+      // Create a new tree if the root is NULL
+      treeManager->root = createNewTree(treeManager, key, pointer);
 
-	// If the tree already exists, then find a leaf where the key can be inserted.
-	leaf = findLeaf(treeManager->root, key);
+      // Check for errors during tree creation
+      if (treeManager->root == NULL) {
+          fprintf(stderr, "Error creating a new tree\n");
+          // Handle the error appropriately, e.g., return an error code or perform other actions.
+          return RC_ERROR;
+      }
+      return RC_OK;
+  }
 
-	if (leaf->num_keys < bTreeOrder - 1) {
-		// If the leaf has room for the new key, then insert the new key into that leaf.
-		leaf = insertIntoLeaf(treeManager, leaf, key, pointer);
-	} else {
-		// If the leaf dows not have room for the new key, split leaf and then insert the new key into that leaf.
-		treeManager->root = insertIntoLeafAfterSplitting(treeManager, leaf, key, pointer);
-	}
 
-	// Print the B+ Tree for debugging purpose.
-	//printf("\n");
-	//printTree(tree);
+	// If the tree already exists, find a leaf where the key can be inserted.
+leaf = findLeaf(treeManager->root, key);
+
+// Check if the leaf has room for the new key.
+if (leaf->num_keys < bTreeOrder - 1) {
+    // If the leaf has room, insert the new key into that leaf.
+    leaf = insertIntoLeaf(treeManager, leaf, key, pointer);
+} else {
+      // If the leaf doesn't have room, split the leaf and then insert the new key into that leaf.
+      Node *newRoot = insertIntoLeafAfterSplitting(treeManager, leaf, key, pointer);
+
+      // Check for errors during leaf splitting
+      if (newRoot == NULL) {
+          fprintf(stderr, "Error inserting into leaf after splitting\n");
+          // Handle the error appropriately, e.g., return an error code or perform other actions.
+          return RC_ERROR;
+      }
+
+      // Update the tree's root after leaf splitting.
+      treeManager->root = newRoot;
+  }
 	return RC_OK;
 }
 
@@ -411,15 +443,29 @@ RC insertKey(BTreeHandle *tree, Value *key, RID rid) {
 //     return RC_OK;
 
 // }
+
 // This function deletes the entry/record with the specified "key" in the B+ Tree.
 RC deleteKey(BTreeHandle *tree, Value *key) {
 	// Retrieve B+ Tree's metadata information.
-	IndexManager *treeManager = (IndexManager *) tree->mgmtData;
+  IndexManager *treeManager = (IndexManager *)tree->mgmtData;
 
-	// Deleting the entry with the specified key.
-	treeManager->root = delete(treeManager, key);
-	//printTree(tree);
-	return RC_OK;
+  // Check for NULL treeManager
+  if (treeManager == NULL) {
+      fprintf(stderr, "Invalid tree manager\n");
+      return RC_ERROR;
+  }
+
+  // Deleting the entry with the specified key.
+  treeManager->root = delete(treeManager, key);
+
+  // Check for errors during deletion
+  if (treeManager->root == NULL) {
+      fprintf(stderr, "Error deleting entry with key %d\n", key);
+      return RC_ERROR;
+  }
+
+  //printTree(tree); // Uncomment if needed
+  return RC_OK;
 }
 
 // RC deleteKey_origin(BTreeHandle *tree, Value *key) {
@@ -537,32 +583,58 @@ RC deleteKey(BTreeHandle *tree, Value *key) {
 // This function initializes the scan which is used to scan the entries in the B+ Tree.
 RC openTreeScan(BTreeHandle *tree, BT_ScanHandle **handle) {
 	// Retrieve B+ Tree's metadata information.
-	IndexManager *treeManager = (IndexManager *) tree->mgmtData;
+  IndexManager *treeManager = (IndexManager *)tree->mgmtData;
 
-	// Retrieve B+ Tree Scan's metadata information.
-	ScanManager *scanmeta = malloc(sizeof(ScanManager));
+  // Check for NULL treeManager
+    if (treeManager == NULL) {
+        fprintf(stderr, "Invalid tree manager\n");
+        return RC_ERROR;
+    }
 
-	// Allocating some memory space.
-	*handle = malloc(sizeof(BT_ScanHandle));
+  Node* node = treeManager->root;
 
-	Node * node = treeManager->root;
+  // Retrieve B+ Tree Scan's metadata information.
+  // Initialize scanmeta members
+    ScanManager* scanmeta = &(ScanManager) {
+    .keyIndex = 0,
+    .totalKeys = node->num_keys,
+    .node = node,
+    .order = treeManager->order
+    };
 
-	if (treeManager->root == NULL) {
-		//printf("Empty tree.\n");
-		return RC_NO_RECORDS_TO_SCAN;
-	} else {
-		//printf("\n openTreeScan() ......... Inside ELse  ");
-		while (!node->is_leaf)
-			node = node->pointers[0];
+  // Allocate memory for the handle.
+  *handle = (BT_ScanHandle *)malloc(sizeof(BT_ScanHandle));
+
+    if (node == NULL) {
+        //printf("Empty tree.\n");
+        return RC_NO_RECORDS_TO_SCAN;
+    } 
+
+    //printf("\n openTreeScan() ......... Inside Else  ");
+    while (!node->is_leaf) {
+        node = node->pointers[0];
+    }
 
 		// Initializing (setting) the Scan's metadata information.
-		scanmeta->keyIndex = 0;
-		scanmeta->totalKeys = node->num_keys;
-		scanmeta->node = node;
-		scanmeta->order = treeManager->order;
-		(*handle)->mgmtData = scanmeta;
+		// Allocate memory for scanmeta
+
+    if (scanmeta == NULL) {
+        // Handle memory allocation failure
+        fprintf(stderr, "Memory allocation error for ScanMeta\n");
+        return RC_ERROR;
+    }
+
+    // Set mgmtData of handle to scanmeta
+    if (handle == NULL || *handle == NULL) {
+        // Handle invalid handle
+        fprintf(stderr, "Invalid handle\n");
+        free(scanmeta); // Free allocated memory before returning
+        return RC_ERROR;
+    }
+
+    (*handle)->mgmtData = scanmeta;
+
 		//printf("\n keyIndex = %d, totalKeys = %d ", scanmeta->keyIndex, scanmeta->totalKeys);
-	}
 	return RC_OK;
 }
 

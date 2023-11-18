@@ -6,260 +6,172 @@
 #include <stdlib.h>
 #include "btree_implement.h"
 
-// Anwesha Nayak start
-
-// Global variable to store the index manager data
 IndexManager *treeManager = NULL;
+static bool storageManagerInitialized = false;
 
-RC initIndexManager(void *mgmtData) {
-	initStorageManager();
+extern RC initIndexManager(void *mgmtData) {
+
+  if (!storageManagerInitialized) {
+        RC initStorageResult = initStorageManager();
+        if (initStorageResult != RC_OK) {
+            return initStorageResult;  
+        }
+        storageManagerInitialized = true; 
+    }
+  if (mgmtData == NULL) {
+        return RC_ERROR;
+    }
+	
 	return RC_OK;
 }
-
-// extern RC initIndexManager_origin (void *mgmtData)
-// {
-//   initStorageManager();
-    
-//   // Allocate memory for IndexManager
-//   treeManager = (IndexManager *)malloc(sizeof(IndexManager));
-//   if (treeManager == NULL) 
-//   {
-//       return RC_ERROR;
-//   }
-
-//   // Initialize IndexManager
-//     treeManager->order = 0;
-//     treeManager->numNodes = 0;
-//     treeManager->numEntries = 0;
-//     treeManager->root = NULL;
-//     treeManager->queue = NULL;
-//     treeManager->keyType = DT_INT; 
-
-
-//   // Initialize Buffer Manager 
-//   BM_BufferPool *bm = (BM_BufferPool *)malloc(sizeof(BM_BufferPool));
-//   if (bm == NULL) 
-//   {
-//     free(treeManager);
-//     return RC_ERROR;
-//   }
-//     treeManager->bufferPool = *bm;
-
-//     return RC_OK;
-// }
-
 
 
 extern RC shutdownIndexManager ()
 {
   if (treeManager != NULL) 
   {
-    // Free the Buffer Pool
-      // shutdownBufferPool(&treeManager->bufferPool);
-      // free(treeManager);
     treeManager = NULL; 
   }
-    
+  else
+  {
+    return RC_ERROR;
+  }
   return RC_OK;
 }
 
-// create, destroy, open, and close an btree index
-// extern RC createBtree_origin (char *idxId, DataType keyType, int n)
-// {
-//   // Check if B+ Tree already exists
-//     if (treeManager != NULL) {
-//         return RC_ERROR; 
-//     }
+extern RC createBtree(char *idxId, DataType keyType, int n) {
+  if (idxId == NULL) {
+        return RC_ERROR;
+    }
 
-//     // Initialize B+ Tree 
-//     treeManager = (IndexManager *)malloc(sizeof(IndexManager));
-//     treeManager->order = n + 2;
-//     treeManager->numNodes = 0;
-//     treeManager->numEntries = 0;
-//     treeManager->root = NULL;
-//     treeManager->queue = NULL;
-//     treeManager->keyType = keyType;
-
-//     // Initialize Buffer Pool
-//     BM_BufferPool *bm = (BM_BufferPool *)malloc(sizeof(BM_BufferPool));
-//     treeManager->bufferPool = *bm;
-//     SM_FileHandle fh;
-//     // Initialize a new page file for the B+ Tree
-//     if (createPageFile(idxId) != RC_OK) {
-//         free(treeManager);
-//         treeManager = NULL;
-//         return RC_FILE_NOT_FOUND; 
-//     }
-
-//     // Open the page file
-//     if (openPageFile(idxId, &fh) != RC_OK) {
-//         free(treeManager);
-//         treeManager = NULL;
-//         return RC_FILE_HANDLE_NOT_INIT; 
-//     }
-
-//     // Allocate a new page for the root of the B+ Tree
-//     if (appendEmptyBlock(&fh) != RC_OK) {
-//         free(treeManager);
-//         treeManager = NULL;
-//         return RC_WRITE_FAILED; 
-//     }
-
-//     // Mark the new page as dirty
-//     if (markDirty(&treeManager->bufferPool, &treeManager->bufferPool.pageHandle) != RC_OK) {
-//         free(treeManager);
-//         treeManager = NULL;
-//         return RC_WRITE_FAILED; 
-//     }
-
-//     // Unpin the page
-//     if (unpinPage(&treeManager->bufferPool, &treeManager->bufferPool.pageHandle) != RC_OK) {
-//         free(treeManager);
-//         treeManager = NULL;
-//         return RC_WRITE_FAILED; 
-//     }
-
-//     // Close the page file
-//     if (closePageFile(&treeManager->bufferPool.fh) != RC_OK) {
-//         free(treeManager);
-//         treeManager = NULL;
-//         return RC_WRITE_FAILED; 
-//     }
-
-//     return RC_OK;
-
-// }
-RC createBtree(char *idxId, DataType keyType, int n) {
-	int maxNodes = PAGE_SIZE / sizeof(Node);
-
-	// Return error if we cannot accommodate a B++ Tree of that order.
-	if (n > maxNodes) {
-		printf("\n n = %d > Max. Nodes = %d \n", n, maxNodes);
+	int max = PAGE_SIZE / sizeof(Node);
+	if (n <= 0 || n > max) {
 		return RC_ORDER_TOO_HIGH_FOR_PAGE;
 	}
 
-	// Initialize the members of our B+ Tree metadata structure.
-	treeManager = (IndexManager *) malloc(sizeof(IndexManager));
-	treeManager->order = n + 2;		// Setting order of B+ Tree
-	treeManager->numNodes = 0;		// No nodes initially.
-	treeManager->numEntries = 0;	// No entries initially
-	treeManager->root = NULL;		// No root node
-	treeManager->queue = NULL;		// No node for printing
-	treeManager->keyType = keyType;	// Set datatype to "keyType"
+  if (keyType < DT_INT || keyType > DT_STRING) {
+        return RC_ERROR;
+    }
 
-	// Initialize Buffer Manager and store in our structure.
-	BM_BufferPool * bm = (BM_BufferPool *) malloc(sizeof(BM_BufferPool));
+	treeManager = (IndexManager *) malloc(sizeof(IndexManager));
+
+  if (treeManager == NULL) {
+        return RC_ERROR;
+    }
+
+  BM_BufferPool * bm = (BM_BufferPool *) malloc(sizeof(BM_BufferPool));
+
+  if (bm == NULL) {
+        free(treeManager);
+        return RC_ERROR;
+    }
+  treeManager->root = NULL;		
+	treeManager->queue = NULL;
+	treeManager->order = n + 2;		
+	treeManager->numNodes = 0;		
+	treeManager->numEntries = 0;			
+	treeManager->keyType = keyType;	
 	treeManager->bufferPool = *bm;
 
-	SM_FileHandle fileHandler;
-	RC result;
+  RC result = createPageFile(idxId);
+    if (result != RC_OK) {
+        free(treeManager);
+        return result;
+    }
 
-	char data[PAGE_SIZE];
+   SM_FileHandle fileHandler;
+    result = openPageFile(idxId, &fileHandler);
+    if (result != RC_OK) {
+        free(treeManager);
+        return result;
+    }
 
-	// Create page file. Return error code if error occurs.
-	if ((result = createPageFile(idxId)) != RC_OK)
-		return result;
+  char data[PAGE_SIZE];
+  result = writeBlock(0, &fileHandler, data);
+    if (result != RC_OK) {
+        free(treeManager);
+        closePageFile(&fileHandler);
+        return result;
+    }
 
-	// Open page file.  Return error code if error occurs.
-	if ((result = openPageFile(idxId, &fileHandler)) != RC_OK)
-		return result;
-
-	// Write empty content to page.  Return error code if error occurs.
-	if ((result = writeBlock(0, &fileHandler, data)) != RC_OK)
-		return result;
-
-	// Close page file.  Return error code if error occurs.
-	if ((result = closePageFile(&fileHandler)) != RC_OK)
-		return result;
-
-	//printf("\n createBtree SUCCESS");
-	return (RC_OK);
+  result = closePageFile(&fileHandler);
+    if (result != RC_OK) {
+        free(treeManager);
+        return result;
+    }
+	
+  return RC_OK;
 }
-// extern RC openBtree_origin (BTreeHandle **tree, char *idxId)
-// {
-//     // Check if B+ Tree is already open
-//     if (treeManager != NULL) {
-//         return RC_ERROR; 
-//     }
 
-//     // Allocate memory for IndexHandle
-//     *tree = (BTreeHandle *)malloc(sizeof(BTreeHandle));
-
-//     // Allocate memory for IndexManager
-//     treeManager = (IndexManager *)malloc(sizeof(IndexManager));
-//     (*tree)->mgmtData = treeManager;
-
-//     // Initialize Buffer Pool
-//     BM_BufferPool *bm = (BM_BufferPool *)malloc(sizeof(BM_BufferPool));
-//     treeManager->bufferPool = *bm;
-
-//     // Initialize Buffer Pool using the existing page file
-//     if (initBufferPool(&treeManager->bufferPool, idxId, 1000, RS_FIFO, NULL) != RC_OK) {
-//         free(*tree);
-//         free(treeManager);
-//         *tree = NULL;
-//         treeManager = NULL;
-//         return RC_FILE_NOT_FOUND; 
-//     }
-
-//     return RC_OK;
-// }
-// This functions opens an existing B+ Tree from the specified page "idxId"
 RC openBtree(BTreeHandle **tree, char *idxId) {
-	// Retrieve B+ Tree handle and assign our metadata structure
+	
+  if (idxId == NULL) 
+  {
+        return RC_ERROR;
+  }
+
 	*tree = (BTreeHandle *) malloc(sizeof(BTreeHandle));
+
+  if (*tree == NULL) 
+  {
+        return RC_ERROR;
+  }
+
 	(*tree)->mgmtData = treeManager;
 
-	// Initialize a Buffer Pool using Buffer Manager
-	RC result = initBufferPool(&treeManager->bufferPool, idxId, 1000, RS_FIFO, NULL);
+	if ((initBufferPool(&treeManager->bufferPool, idxId, 1000, RS_FIFO, NULL)) != RC_OK) {
+        free(*tree);
+        *tree = NULL;
+        return RC_ERROR;
+    }
 
-	if (result == RC_OK) {
-		//printf("\n openBtree SUCCESS");
-		return RC_OK;
-	}
-	return result;
+    return RC_OK;
 }
 
 extern RC closeBtree (BTreeHandle *tree)
 {
+
+  if (tree == NULL || tree->mgmtData == NULL)
+  {
+        return RC_ERROR;
+  }
+
   IndexManager *treeManager = (IndexManager *)tree->mgmtData;
 
-  // Check if B+ Tree is not open
-  if (treeManager == NULL) {
+  if (treeManager == NULL)
+  {
     return RC_ERROR;
   }
 
-  // Mark page as dirty 
+  if (treeManager->bufferPool.pageFile == NULL) 
+  {
+        return RC_READ_NON_EXISTING_PAGE;
+  }
+  
   markDirty(&treeManager->bufferPool, &treeManager->pageHandler);
-
-  // Shutdown the Buffer Pool
   shutdownBufferPool(&treeManager->bufferPool);
-  free(treeManager);
+  free(tree->mgmtData);
   free(tree);
-
-  treeManager = NULL;
-
   return RC_OK;
 }
 
 extern RC deleteBtree (char *idxId)
 {
+   if (idxId == NULL) 
+    {
+        return RC_ERROR;
+    }
+
   if (treeManager == NULL)
   {
       return RC_ERROR; 
   }
 
-    // Destroy the page file 
-    RC code = destroyPageFile(idxId);
+   destroyPageFile(idxId);
 
-    if (code != RC_OK) {
-        return code; 
-    }
-    
     return RC_OK;
 }
 
-// Anwesha Nayak end
 // Number of nodes present in the B+ Tree.
 RC getNumNodes(BTreeHandle *tree, int *result) {
 	// Fetches metadata of B+ Tree.
